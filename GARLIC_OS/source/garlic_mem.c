@@ -10,18 +10,61 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>	//estan definides el tipus de param. headers del .elf
 
 #include <garlic_system.h>	// definición de funciones y variables de sistema
 
 #define INI_MEM 0x01002000		// dirección inicial de memoria para programas
 
+#define EI_NIDENT 16
+#define PT_LOAD 1	//tipus de segment -> CARREGABLE a memòria
+						//(ELF) = 1 (entero).
 
+unsigned int dMem_lliure = INI_MEM;	//pos. mem. lliure dinàmicament ( suposem total segments < 24KB)
+										//inicialment valor carrega primer seg.
+
+//tipus de variables en .elf 
+typedef uint32_t Elf32_Addr;   // 4 bytes (direcció de mem.)
+typedef uint16_t Elf32_Half;   // 2 bytes (half int unsigned)
+typedef uint32_t Elf32_Off;    // 4 bytes (desp. dins del fit.)
+typedef uint32_t Elf32_Word;   // 4 bytes (unsigned int)
+
+//.elf header
+typedef struct{ 
+	unsigned char e_ident[EI_NIDENT];
+	Elf32_Half e_type;
+	Elf32_Half e_machine;
+	Elf32_Word e_version;
+	Elf32_Addr e_entry;
+	Elf32_Off e_phoff;
+	Elf32_Off e_shoff;
+	Elf32_Word e_flags;
+	Elf32_Half e_ehsize;
+	Elf32_Half e_phentsize;
+	Elf32_Half e_phnum;
+	Elf32_Half e_shentsize;
+	Elf32_Half e_shnum;
+	Elf32_Half e_shstrndx;
+} Elf32_Ehdr;
+
+
+//program header (T. segments)
+typedef struct {
+Elf32_Word p_type;
+Elf32_Off p_offset;
+Elf32_Addr p_vaddr;
+Elf32_Addr p_paddr;
+Elf32_Word p_filesz;
+Elf32_Word p_memsz;
+Elf32_Word p_flags;
+Elf32_Word p_align;
+} Elf32_Phdr;
 
 /* _gm_initFS: inicializa el sistema de ficheros, devolviendo un valor booleano
 					para indiciar si dicha inicialización ha tenido éxito; */
 int _gm_initFS()
 {
-	return 0;
+	return nitroFSInit(NULL); 	//ini. sis. fit. NITRO
 }
 
 
@@ -40,7 +83,30 @@ int _gm_initFS()
 */
 intFunc _gm_cargarPrograma(char *keyName)
 {
+	//cargar la ruta del .elf del programa
+	char ruta[32];
+	sprintf(ruta, "/Programas/%s.elf", keyName);
+	
+	FILE *fit = fopen(ruta, "rb");
+	if (fit == NULL){
+		printf("ERROR: intent obrir fitxer %s \n", ruta);
+		return (intFunc)0;
+	} 	
+	printf("S'ha obert el fitxer \n");
 
-	return ((intFunc) 0);
+	fseek(fit, 0, SEEK_END);
+	long fsize = ftell(fit); //fsize = mida .elf del programa
+	fseek(fit, 0, SEEK_SET);
+	
+	//TODO: crear el propi malloc
+	char *fitBuffer = (char *)malloc(fsize);  
+	if (fitBuffer == NULL){
+		printf("ERROR: reserva espai buffer fitxer \n");
+		fclose(fit);
+		return (intFunc)0;
+	}
+	printf("S'ha reservat mem. pel fitxer \n");
+	
+	return ((intFunc) INI_MEM);
 }
 
