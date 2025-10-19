@@ -99,6 +99,7 @@ intFunc _gm_cargarPrograma(char *keyName)
 	fseek(fit, 0, SEEK_SET);
 	
 	//TODO: crear el propi malloc
+	//carga fitxer a memoria 
 	char *fitBuffer = (char *)malloc(fsize);  
 	if (fitBuffer == NULL){
 		printf("ERROR: reserva espai buffer fitxer \n");
@@ -107,6 +108,37 @@ intFunc _gm_cargarPrograma(char *keyName)
 	}
 	printf("S'ha reservat mem. pel fitxer \n");
 	
-	return ((intFunc) INI_MEM);
+	size_t freadsize = fread(fitBuffer, 1, fsize, fit);
+	if (freadsize != fsize){
+		printf("ERROR: copia contingut fitxer to buffer \n");
+		fclose(fit);
+		//TODO: crear propi free
+		free(fitBuffer);
+		return (intFunc)0;
+	}
+	fclose(fit);
+	printf("S'ha copiat el contingut del fitxer a memoria amb mida %u bytes\n", freadsize);
+	
+	Elf32_Ehdr *elfHeader = (Elf32_Ehdr *)fitBuffer;
+	Elf32_Phdr *progHeader = (Elf32_Phdr *)(fitBuffer + elfHeader->e_phoff);
+ 
+	unsigned int *entryPoint = NULL;
+	
+	for(int i = 0; i < elfHeader->e_phnum; i++){
+		if (progHeader[i].p_type != PT_LOAD) continue;
+		
+		//direccio inicial programa
+		unsigned int *memDest = (unsigned int *)(dMem_lliure + progHeader[i].p_paddr);
+		
+		if (entryPoint == NULL){
+			//calcul dir. reubicada primera instrucció programa 
+			entryPoint = (unsigned int *)(memDest + (elfHeader->e_entry - progHeader[0].p_vaddr));
+		}
+		
+	
+	}
+	
+	return (intFunc)entryPoint;
+	//return ((intFunc) INI_MEM);
 }
 
