@@ -121,22 +121,31 @@ intFunc _gm_cargarPrograma(char *keyName)
 	
 	Elf32_Ehdr *elfHeader = (Elf32_Ehdr *)fitBuffer;
 	Elf32_Phdr *progHeader = (Elf32_Phdr *)(fitBuffer + elfHeader->e_phoff);
- 
-	unsigned int *entryPoint = NULL;
+	
+	unsigned int offset = dMem_lliure - progHeader[0].p_paddr;
+	unsigned int *entryPoint = (unsigned int *)(elfHeader->e_entry + offset);
 	
 	for(int i = 0; i < elfHeader->e_phnum; i++){
 		if (progHeader[i].p_type != PT_LOAD) continue;
 		
 		//direccio inicial programa
-		unsigned int *memDest = (unsigned int *)(dMem_lliure + progHeader[i].p_paddr);
+		unsigned int *memDest = (unsigned int *)(offset + progHeader[i].p_paddr);
+		printf("El seg. %d es carrega a %p \n", i, memDest);
+		printf("El start() estara a %p \n", entryPoint);
 		
-		if (entryPoint == NULL){
-			//calcul dir. reubicada primera instrucció programa 
-			entryPoint = (unsigned int *)(memDest + (elfHeader->e_entry - progHeader[0].p_vaddr));
-		}
+		_gs_copiaMem(fitBuffer + progHeader[i].p_offset, memDest, progHeader[i].p_filesz);
 		
-	
+		//si (p_memsz > p_filesz), existeix part segment en memoria que no 
+			//esta en el arxiu (cas zones .bss), posar-la a valor 0.
+		if (progHeader[i].p_memsz > progHeader[i].p_filesz)
+			memset(memDest + progHeader[i].p_filesz, 0, progHeader[i].p_memsz - progHeader[i].p_filesz);
+		
+		//reubicacions de memoria
+		_gm_reubicar(fitBuffer, (unsigned int)memDest, memDest);
+		dMem_lliure += progHeader[i].p_memsz;	
 	}
+	
+	free(fitBuffer);
 	
 	return (intFunc)entryPoint;
 	//return ((intFunc) INI_MEM);
