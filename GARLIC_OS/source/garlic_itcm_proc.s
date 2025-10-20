@@ -69,8 +69,44 @@ _gp_IntrMain:
 	@; se encarga de actualizar los tics, intercambiar procesos, etc.
 _gp_rsiVBL:
 	push {r4-r7, lr}
-
-
+		@; Incrementar comptador tics.
+		ldr r4, =_gd_tickCount		@; Carreguem l'adreça de la variable comptador de tics global.
+		ldr r5, [r4] 				@; Carreguem el valor de la variable comptador de tics.
+		add r5, #1					@; Incrementem el valor de la variable.
+		str r5, [r4]				@; Guardem el valor modificat.
+		
+		@; Comprovar si hi ha algun procés a la cua nReady.
+		ldr r6, =_gd_nReady			@; Carregum l'adreça de la variable de nombre de processos a la cua.
+		ldr r7, [r6]				@; Carreguem el valor de la variable.
+		cmp r7, #0					@; Mirem si hi han processos a la cua.
+		beq .Lfinal					@; Si no hi han processos a la cua, finalitzem la RSI.
+		
+		@; Comprovar si el procés no és del S.O i el seu PID és 0.
+		ldr r4, =_gd_pidz			@; Carreguem adreça de la variable PID i sòcol del procés actual
+		ldr r4, [r4]				@; Carreguem el valor de la variable PIDZ
+		cmp r4, #0					@; Si PIDZ = 0, és el sistema operatiu -> Salvem el seu estat.
+		beq .LsalvarProces			
+		mov r4, r4, lsr #4			@; Aillem els 28 bits alts del PID
+		cmp r4, #0					@; Si el PID és 0, el procés ha acabat -> Restaurem el següent procés.
+		beq .LrestaurarProces
+		
+		@; Crida a la funció de salvar l'estat del procés.
+		.LsalvarProces:
+		ldr r4, =_gd_nReady			@; Preparem els paràmetres per la crida a _gp_salvarProc
+		ldr r5, [r4]
+		ldr r6, = _gd_pidz
+		bl _gp_salvarProc			@; Cridem la funció _gp_salvarProc
+		str r5, [r4]				@; Guardem el valor actualitzat del nombre de processos a la cua Ready.
+		
+		@; Crida a la funció de restaurar l'estat del procés.
+		.LrestaurarProces:
+		ldr r4, =_gd_nReady			@; Preparem els paràmetres per la crida a _gp_restaurarProc
+		ldr r5, [r4]
+		ldr r6, = _gd_pidz
+		bl _gp_restaurarProc		@; Cridem la funció _gp_restaurarProc
+		
+		
+	.Lfinal:
 	pop {r4-r7, pc}
 
 
@@ -84,8 +120,68 @@ _gp_rsiVBL:
 	@; R5: nuevo número de procesos en READY (+1)
 _gp_salvarProc:
 	push {r8-r11, lr}
-
-
+		@; Guardar el número de sòcol a la cua de Ready
+		ldr r8, [r6]				@; Carreguem el valor del PID i el número de sòcol del procés a salvar.
+		and r8, r8, #0xF			@; Filtrem els 4 bits baixos (el número de sòcol).
+		ldr r9, =_gd_qReady			@; Carreguem l'adreça de la cua de Ready.
+		strb r8, [r9, r5]			@; Guardar el número de sòcol a la cua de Ready a la següent posició buida.
+		add r5, #1					@; Incrementem el comptador de processos en estat Ready.
+		
+		@; Guardar el valor del PC al vector de PCB
+		ldr r9, =_gd_pcbs			@; Carreguem l'adreça del vector de PCBs.
+		mov r10, #24				@; Desem la dimensió de cadascun de les posicions del struct (6 ints * 4 bytes/int = 24).
+		mla r9, r10, r8, r9			@; Calculem l'adreça de la posició del vector PCB del sòcol actual (Dimensió de cada posició * Número de sòcol + Adreça base del vector PCBs).
+		mov r10, sp					@; Carreguem a R10 el punter de la pila SP en mode IRQ, per tant SP_irq.
+		ldr r8, [r10, #60]			@; Carreguem a R8 el PC del procés a aturar (SP_irq amb un desplaçament de 60).
+		str r8, [r9, #4] 			@; Guardem el valor del PC al segon camp del struct del PCB.
+		
+		@; Guardar el CPSR dins del seu PCB
+		mrs r11, SPSR				@; Carreguem a R11 el SPSR (el CPSR del procés aturat).
+		str r11, [r9, #12]			@; Guardem el SPSR al camp Status del PCB.
+		
+		@; Activar el mode sistema
+		mrs r8, CPSR				@; Carreguem a R8 el CPSR (l'estat actual del processador).
+		orr r8, r8, #0x1F			@; Posem els 5 bits de menys pes del CPSR a 1 (1111b) per activar el mode sistema.
+		mrs CPSR, r8				@; Tornem a guardar el CPSR amb el mode sistema actiu.
+		
+		@; Apilar els registres R0-R12 i R14 del procés a aturar.
+		push {r14}					@; Apilem R14 (LR_sys, el Link Register del procés).
+		ldr r8, [r10, #56]    		@; Carrega a R8 el valor de R12 (guardat a [SP_irq + 56])
+		push {r8}             		@; Apila R12 a la pila del procés (SP_sys)
+		ldr r8, [r10, #12]    		@; Carrega a R8 el valor de R11 (guardat a [SP_irq + 12])
+		push {r8}             		@; Apila R11 a la pila del procés
+		ldr r8, [r10, #8]     		@; Carrega a R8 el valor de R10 (guardat a [SP_irq + 8])
+		push {r8}             		@; Apila R10 a la pila del procés
+		ldr r8, [r10, #4]     		@; Carrega a R8 el valor de R9 (guardat a [SP_irq + 4])
+		push {r8}					@; Apila R9 a la pila del procés
+		ldr r8, [r10, #0]     		@; Carrega a R8 el valor de R8 (guardat a [SP_irq + 0])
+		push {r8}             		@; Apila R8 a la pila del procés
+		ldr r8, [r10, #32]    		@; Carrega a R8 el valor de R7 (guardat a [SP_irq + 32])
+		push {r8}             		@; Apila R7 a la pila del procés
+		ldr r8, [r10, #28]    		@; Carrega a R8 el valor de R6 (guardat a [SP_irq + 28])
+		push {r8}             		@; Apila R6 a la pila del procés
+		ldr r8, [r10, #24]    		@; Carrega a R8 el valor de R5 (guardat a [SP_irq + 24])
+		push {r8}             		@; Apila R5 a la pila del procés
+		ldr r8, [r10, #20]    		@; Carrega a R8 el valor de R4 (guardat a [SP_irq + 20])
+		push {r8}             		@; Apila R4 a la pila del procés
+		ldr r8, [r10, #52]   		@; Carrega a R8 el valor de R3 (guardat a [SP_irq + 52])
+		push {r8}             		@; Apila R3 a la pila del procés
+		ldr r8, [r10, #48]    		@; Carrega a R8 el valor de R2 (guardat a [SP_irq + 48])
+		push {r8}             		@; Apila R2 a la pila del procés
+		ldr r8, [r10, #44]    		@; Carrega a R8 el valor de R1 (guardat a [SP_irq + 44])
+		push {r8}             		@; Apila R1 a la pila del procés
+		ldr r8, [r10, #40]    		@; Carrega a R8 el valor de R0 (guardat a [SP_irq + 40])
+		push {r8}             		@; Apila R0 a la pila del procés
+		
+		@; Guardem el valor de R13 (el Stack Pointer) al tercer camp del struct PCB.
+		str r13, [r9, #8]			
+		
+		@; Tornar al mode d'execudció IRQ.
+		mrs r8, CPSR				@; Carreguem el valor del CPSR (estat actual del processador).
+		and r8, r8, #0xFFFFFFE0		@; Reiniciem els 5 bits de menys pes a 0.
+		orr r8, r8, #0x12			@; Posem els 5 bits de menys pes en mode Normal Interrupt Request (10010b = 12h).
+		mrs CPSR, r8				@; Guardem el CPSR per confirmar el canvi de mode.
+		
 	pop {r8-r11, pc}
 
 
@@ -96,7 +192,7 @@ _gp_salvarProc:
 	@; R6: dirección _gd_pidz
 _gp_restaurarProc:
 	push {r8-r11, lr}
-
+		
 
 	pop {r8-r11, pc}
 
@@ -106,7 +202,7 @@ _gp_restaurarProc:
 	@; R0: número de procesos total
 _gp_numProc:
 	push {lr}
-
+		
 
 	pop {pc}
 
