@@ -24,7 +24,7 @@
 	@; cambio de las direcciones de memoria que se tienen que ajustar
 _gm_reubicar:
 	push {lr}
-
+		
 
 	pop {pc}
 

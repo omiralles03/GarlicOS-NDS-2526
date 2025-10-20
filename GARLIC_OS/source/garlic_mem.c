@@ -92,7 +92,7 @@ intFunc _gm_cargarPrograma(char *keyName)
 		printf("ERROR: intent obrir fitxer %s \n", ruta);
 		return (intFunc)0;
 	} 	
-	printf("S'ha obert el fitxer \n");
+	//printf("S'ha obert el fitxer \n");
 
 	fseek(fit, 0, SEEK_END);
 	long fsize = ftell(fit); //fsize = mida .elf del programa
@@ -106,7 +106,7 @@ intFunc _gm_cargarPrograma(char *keyName)
 		fclose(fit);
 		return (intFunc)0;
 	}
-	printf("S'ha reservat mem. pel fitxer \n");
+	//printf("S'ha reservat mem. pel fitxer \n");
 	
 	size_t freadsize = fread(fitBuffer, 1, fsize, fit);
 	if (freadsize != fsize){
@@ -117,7 +117,7 @@ intFunc _gm_cargarPrograma(char *keyName)
 		return (intFunc)0;
 	}
 	fclose(fit);
-	printf("S'ha copiat el contingut del fitxer a memoria amb mida %u bytes\n", freadsize);
+	//printf("S'ha copiat el contingut del fitxer a memoria amb mida %u bytes\n", freadsize);
 	
 	Elf32_Ehdr *elfHeader = (Elf32_Ehdr *)fitBuffer;
 	Elf32_Phdr *progHeader = (Elf32_Phdr *)(fitBuffer + elfHeader->e_phoff);
@@ -130,21 +130,22 @@ intFunc _gm_cargarPrograma(char *keyName)
 		
 		//direccio inicial programa
 		unsigned int *memDest = (unsigned int *)(offset + progHeader[i].p_paddr);
-		printf("El seg. %d es carrega a %p \n", i, memDest);
-		printf("El start() estara a %p \n", entryPoint);
+		//printf("El seg. %d es carrega a %p \n", i, memDest);
+		//printf("El start() estara a %p \n", entryPoint);
 		
 		_gs_copiaMem(fitBuffer + progHeader[i].p_offset, memDest, progHeader[i].p_filesz);
 		
 		//si (p_memsz > p_filesz), existeix part segment en memoria que no 
 			//esta en el arxiu (cas zones .bss), posar-la a valor 0.
-		if (progHeader[i].p_memsz > progHeader[i].p_filesz)
-			memset(memDest + progHeader[i].p_filesz, 0, progHeader[i].p_memsz - progHeader[i].p_filesz);
-		
+		if (progHeader[i].p_memsz > progHeader[i].p_filesz){
+			void *bss_start = (char *)memDest + progHeader[i].p_filesz;
+            unsigned int bss_size = progHeader[i].p_memsz - progHeader[i].p_filesz;
+            memset(bss_start, 0, bss_size);
+		}
 		//reubicacions de memoria
 		_gm_reubicar(fitBuffer, (unsigned int)memDest, memDest);
 		dMem_lliure += progHeader[i].p_memsz;	
 	}
-	
 	free(fitBuffer);
 	
 	return (intFunc)entryPoint;
