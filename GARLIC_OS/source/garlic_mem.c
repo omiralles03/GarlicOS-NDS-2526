@@ -119,10 +119,12 @@ intFunc _gm_cargarPrograma(char *keyName)
 	fclose(fit);
 	//printf("S'ha copiat el contingut del fitxer a memoria amb mida %u bytes\n", freadsize);
 	
+	unsigned int dMem_lliure_inicial = dMem_lliure;
+	
 	Elf32_Ehdr *elfHeader = (Elf32_Ehdr *)fitBuffer;
 	Elf32_Phdr *progHeader = (Elf32_Phdr *)(fitBuffer + elfHeader->e_phoff);
 	
-	unsigned int offset = dMem_lliure - progHeader[0].p_paddr;
+	unsigned int offset = dMem_lliure_inicial - progHeader[0].p_paddr;	
 	unsigned int *entryPoint = (unsigned int *)(elfHeader->e_entry + offset);
 	
 	for(int i = 0; i < elfHeader->e_phnum; i++){
@@ -143,9 +145,9 @@ intFunc _gm_cargarPrograma(char *keyName)
             memset(bss_start, 0, bss_size);
 		}
 		//reubicacions de memoria
-		_gm_reubicar(fitBuffer, (unsigned int)memDest, memDest);
 		dMem_lliure += progHeader[i].p_memsz;	
 	}
+	_gm_reubicar(fitBuffer, progHeader[0].p_paddr, (unsigned int *)dMem_lliure_inicial);
 	free(fitBuffer);
 	
 	return (intFunc)entryPoint;
