@@ -192,19 +192,97 @@ _gp_salvarProc:
 	@; R6: dirección _gd_pidz
 _gp_restaurarProc:
 	push {r8-r11, lr}
+		@; Carregar el número de sòcol del procés a restaurar.
+		ldr r8, =_gd_qReady			@; Carreguem la cua de processos en estat Ready.
+		ldrb r11, [r8]				@; Carreguem el número de sòcol del primer procés a la cua.
+		sub r5, r5, #1				@; Reduim el nombre de processos al comptador de Ready.
+		str r5, [r4]				@; Guardem el comptador actualitzat.
+		mov r10, #0					@; Inicialitzem un comptador pel bucle de reordenar la cua.
+		.LreorderQueue:
+			cmp r10, r5				@; Mirem si ha acabat el bucle.
+			beq .LreorderEnd		@; Si hem acabat sortim del bucle.
+			ldrb r9, [r8, #1]		@; Carreguem la següent posició de la cua.
+			strb r9, [r8]			@; La guardem a la posició actual.
+			add r8, r8, #1			@; Avançem el índex de la cua.
+			add r10, r10, #1		@; Incrementem comptador d'iteracions.
+			b .LreorderQueue
+		.LreorderEnd:
 		
-
+		@; Desar el PID i el número de sòcol del procés a restaurar dins de la variable global _gd_pidz
+		ldr r9, =_gd_pcbs			@; Carreguem l'adreça base del vector de PCBs dels processos.
+		mov r10, #24				@; Desem la dimensió de cadascun de les posicions del struct (6 ints * 4 bytes/int = 24).
+		mla r9, r10, r11, r9		@; Calculem la adreça del PCB del procés actual (Sòcol * Tamany PCB + Adreça base PCBs).
+		ldr r10, [r9, #0]			@; Carreguem la primera posició (PID) del PCB del procés actual.
+		mov r10, r10, lsl #4		@; Fem espai pel número de sòcol desplaçant 4 bits a l'esquerra el PID
+		orr r10, r10, r11			@; Combinem número de sòcol amb el PID.
+		str r10, [r6]				@; Guardem el PIDZ del procés restaurat a la variable _gd_pidz.
+			
+		@; Carregar el PC del procés a restaurar a la pila SP_irq
+		ldr r8, [r9, #4]			@; Carreguem el PC (el segon camp del seu PCB) del procés a restaurar.
+		mov r10, sp					@; Carreguem la pila SP en mode IRQ (SP_irq) a R10.
+		str r8, [r10, #60]			@; Guardem el PC del procés dins de la posició 60 del SP_irq (el Link Register)
+		
+		@; Carreguem el CPSR del procés a restaurar
+		ldr r8, [r9, #12]			@; Carreguem el estat del processador (CPSR del procés a restaurar) de la tercera posició del seu PCB.
+		msr SPSR, r8				@; Guardem el CPSR al registre SPSR
+		
+		@; Canviem el mode d'execució a System
+		mrs r8, CPSR				@; Carreguem el estat actual del processador
+		orr r8, r8, #0x1F			@; Posem els 5 bits de mode d'execució a 1 (11111b)
+		mrs CPSR, r8				@; Guardem el nou CPSR en mode System.
+		
+		@; Restaurem el punter de pila del procés
+		ldr r13, [r9, #8]			@; Carreguem a R13 (en mode System equival al SP_sys) el punter del PCB del procés a restaurar.
+		
+		@; Desapilem els registres R0-R12 i R14 del procés a restaurar i els posem a la SP_irq
+		pop {r8}               		@; Desapila R0 de la pila del procés (SP_sys)
+		str r8, [r10, #40]     		@; Guarda R0 a la pila d'IRQ (pos. 10)
+		pop {r8}               		@; Desapila R1 de la pila del procés
+		str r8, [r10, #44]     		@; Guarda R1 a la pila d'IRQ (pos. 11) 
+		pop {r8}               		@; Desapila R2 de la pila del procés
+		str r8, [r10, #48]     		@; Guarda R2 a la pila d'IRQ (pos. 12) 
+		pop {r8}               		@; Desapila R3 de la pila del procés
+		str r8, [r10, #52]     		@; Guarda R3 a la pila d'IRQ (pos. 13) 
+		pop {r8}               		@; Desapila R4 de la pila del procés
+		str r8, [r10, #20]     		@; Guarda R4 a la pila d'IRQ (pos. 5) 
+		pop {r8}               		@; Desapila R5 de la pila del procés
+		str r8, [r10, #24]     		@; Guarda R5 a la pila d'IRQ (pos. 6)
+		pop {r8}               		@; Desapila R6 de la pila del procés
+		str r8, [r10, #28]     		@; Guarda R6 a la pila d'IRQ (pos. 7) 
+		pop {r8}               		@; Desapila R7 de la pila del procés
+		str r8, [r10, #32]     		@; Guarda R7 a la pila d'IRQ (pos. 8) 
+		pop {r8}               		@; Desapila R8 de la pila del procés
+		str r8, [r10, #0]      		@; Guarda R8 a la pila d'IRQ (pos. 0)
+		pop {r8}               		@; Desapila R9 de la pila del procés
+		str r8, [r10, #4]      		@; Guarda R9 a la pila d'IRQ (pos. 1)
+		pop {r8}               		@; Desapila R10 de la pila del procés
+		str r8, [r10, #8]      		@; Guarda R10 a la pila d'IRQ (pos. 2) 
+		pop {r8}               		@; Desapila R11 de la pila del procés
+		str r8, [r10, #12]     		@; Guarda R11 a la pila d'IRQ (pos. 3) 
+		pop {r8}               		@; Desapila R12 de la pila del procés
+		str r8, [r10, #56]     		@; Guarda R12 a la pila d'IRQ (pos. 14) 
+		pop {r14}              		@; Desapila el registre R14 (LR_sys) de la pila del procés i el restaura directament al registre R14 del mode actual (System)
+		
+		@; Tornem al mode d'execució IRQ
+		mrs r8, CPSR				@; Carreguem el estat actual del processador.
+		and r8, r8, #0xFFFFFFE0		@; Reiniciem els 5 bits de menys pes (mode d'execució) a 0.ç
+		orr r8, r8, #0x12			@; Posem els bits de mode d'execució en mode Normal Interrupt Request (10010b = 12h).
+		mrs CPSR, r8				@; Guardem el CPSR amb el nou mode.
 	pop {r8-r11, pc}
 
 
 	.global _gp_numProc
-	@;Resultado
+	
+	
+	@; Retorna el nombre total de processos en el sistema (Procés en Run + Processos en Ready)
+	@; Resultado
 	@; R0: número de procesos total
 _gp_numProc:
-	push {lr}
-		
-
-	pop {pc}
+	push {r1, lr}
+		ldr r1, =_gd_nReady			@; Carreguem direcció de variable de nombre de processos en Ready.
+		ldr r1, [r1]				@; Carreguem el valor de la variable.
+		add r0, r1, #1				@; Retornem per R0 (Nombre de processos Ready + 1) per tenir en compte el procés en estat Run.
+	pop {r1, pc}
 
 
 	.global _gp_crearProc
