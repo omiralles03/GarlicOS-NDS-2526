@@ -145,7 +145,8 @@ intFunc _gm_cargarPrograma(char *keyName)
             memset(bss_start, 0, bss_size);
 		}
 		//reubicacions de memoria
-		dMem_lliure += progHeader[i].p_memsz;	
+		dMem_lliure += progHeader[i].p_memsz;
+		dMem_lliure = (dMem_lliure + 3) & ~3;	//round-up a adreça divisible per 4 
 	}
 	_gm_reubicar(fitBuffer, progHeader[0].p_paddr, (unsigned int *)dMem_lliure_inicial);
 	free(fitBuffer);
