@@ -142,7 +142,7 @@ _gp_salvarProc:
 		@; Activar el mode sistema
 		mrs r8, CPSR				@; Carreguem a R8 el CPSR (l'estat actual del processador).
 		orr r8, r8, #0x1F			@; Posem els 5 bits de menys pes del CPSR a 1 (1111b) per activar el mode sistema.
-		mrs CPSR, r8				@; Tornem a guardar el CPSR amb el mode sistema actiu.
+		msr CPSR, r8				@; Tornem a guardar el CPSR amb el mode sistema actiu.
 		
 		@; Apilar els registres R0-R12 i R14 del procés a aturar.
 		push {r14}					@; Apilem R14 (LR_sys, el Link Register del procés).
@@ -180,7 +180,7 @@ _gp_salvarProc:
 		mrs r8, CPSR				@; Carreguem el valor del CPSR (estat actual del processador).
 		and r8, r8, #0xFFFFFFE0		@; Reiniciem els 5 bits de menys pes a 0.
 		orr r8, r8, #0x12			@; Posem els 5 bits de menys pes en mode Normal Interrupt Request (10010b = 12h).
-		mrs CPSR, r8				@; Guardem el CPSR per confirmar el canvi de mode.
+		msr CPSR, r8				@; Guardem el CPSR per confirmar el canvi de mode.
 		
 	pop {r8-r11, pc}
 
@@ -229,7 +229,7 @@ _gp_restaurarProc:
 		@; Canviem el mode d'execució a System
 		mrs r8, CPSR				@; Carreguem el estat actual del processador
 		orr r8, r8, #0x1F			@; Posem els 5 bits de mode d'execució a 1 (11111b)
-		mrs CPSR, r8				@; Guardem el nou CPSR en mode System.
+		msr CPSR, r8				@; Guardem el nou CPSR en mode System.
 		
 		@; Restaurem el punter de pila del procés
 		ldr r13, [r9, #8]			@; Carreguem a R13 (en mode System equival al SP_sys) el punter del PCB del procés a restaurar.
@@ -267,7 +267,7 @@ _gp_restaurarProc:
 		mrs r8, CPSR				@; Carreguem el estat actual del processador.
 		and r8, r8, #0xFFFFFFE0		@; Reiniciem els 5 bits de menys pes (mode d'execució) a 0.ç
 		orr r8, r8, #0x12			@; Posem els bits de mode d'execució en mode Normal Interrupt Request (10010b = 12h).
-		mrs CPSR, r8				@; Guardem el CPSR amb el nou mode.
+		msr CPSR, r8				@; Guardem el CPSR amb el nou mode.
 	pop {r8-r11, pc}
 
 
@@ -296,10 +296,82 @@ _gp_numProc:
 	@;Resultado
 	@; R0: 0 si no hay problema, >0 si no se puede crear el proceso
 _gp_crearProc:
-	push {lr}
-
-
-	pop {pc}
+	push {r4-r7, lr}
+		@; Comprovacions inicials de sòcol.
+		cmp r1, #0					@; Mirem si el sòcol és 0 (sistema operatiu).
+		beq .Ldeny					@; Retornem error si és el sistema.
+		ldr r4, =_gd_pcbs			@; Carreguem l'adreça del vector de PCBs.
+		mov r5, #24					@; Tamany de cada posició del vector (6 ints * 4 bytes/int).
+		mla r6, r1, r5, r4			@; Calculem l'adreça del PCB del sòcol (Núm. sòcol * Tamany de cada posició + Adreça base vector PCBs).
+		ldr r7, [r6, #0]			@; Mirem el PID del procés a crear (1a posició del seu PCB).
+		cmp r7, #0					@; Comprovem que el PID sigui 0 (en cas contrari, el sòcol passat per R1 està ocupat per un altre procés).
+		bne .Ldeny					@; Retornem error si el sòcol està ocupat.
+		
+		@; Assignem un nou PID al procés
+		ldr r4, =_gd_pidCount		@; Carreguem l'adreça de la variable comptador de PIDs.
+		ldr r5, [r4]				@; Carreguem el valor de la variable.
+		add r5, r5, #1				@; Incrementem el comptador.
+		str r5, [r4]				@; Actualitzem la variable.
+		str r5, [r6, #0]			@; Actualitzem el camp PID del PCB del procés (1a posició).
+		
+		@; Guardem la direcció inicial de la rutina dins del seu PCB.
+		add r0, r0, #4				@; Sumem 4 a la direcció inicial per compensar el retorn d'excepció IRQ.
+		str r0, [r6, #4]			@; Guardem la direcció inicial al camp PC del PCB del procés.
+		
+		@; Guardar el nom del procés.
+		ldr r4, [r2]				@; Carreguem el nom.
+		str r4, [r6, #16]			@; Desem el nom en el camp keyName del PCB del procés.
+		
+		@; Carregar la direcció de la pila del procés
+		ldr r4, =_gd_stacks			@; Adreça del vector de piles dels processos.
+		mov r5, #512				@; Dimensió de cada pila (128 registres * 4 bytes/registre).
+		mla r7, r5, r1, r4			@; Calculem l'adreça de la pila del procés (Sòcol * Dimensió pila + Adreça base vector piles)
+		
+		@; Col·locar la funció terminarProc al principi de la pila del procés (a la posició LR)
+		ldr r4, =_gp_terminarProc	@; Carreguem l'adreça de la funció per finalitzar un procés usuari.
+		sub r7, r7, #4				@; Fem espai a la pila del procés per l'adreça de la funció.
+		str r4, [r7]				@; Guardem l'adreça de la funció a la pila del procés.
+		
+		@; Guardem els registres R0-R12 i R14
+		mov r4, #0					@; Index del bucle.		
+		mov r5, #0					@; Inicializtem els registres R1-R12 a 0.
+		.Lregisters:
+			sub r7, #4				@; Fem espai pel registre a la pila.
+			str r5, [r7]			@; Guardem a la pila del procés.
+			add r4, r4, #1			@; Incrementem index bucle.
+			cmp r4, #12				@; Mirem si ha finalitzat el bucle.
+			bne .Lregisters			@; Si no ha acabat, fem una altre iteració.
+		sub r7, #4					@; Fem espai per R0.
+		str r3, [r7]				@; Passem el/s argument/s a R0.
+		
+		@; Guardem la direcció de la pila al tercer camp del PCB del procés.
+		str r7, [r6, #8]
+		
+		@; Desem el valor inicial del CPSR en el camp Status del PCB del procés.
+		mov r7, #0x1F				@; Inicialitzem a R7 els 5 bits corresponents al mode System del processador (11111b).
+		str r7, [r6, #12]			@; Desem el valor al camp Status del PCB.
+			
+		@; Inicalitzem variable workTicks a 0 i la desem al PCB.
+		mov r7, #0					@; Inicialitzem R7 a 0.
+		str r7, [r6, #20]			@; Desem la variable workTicks inicialitzada a 0.
+		
+		@; Guardem el sòcol al final de la cua de processos en estat Ready.
+		ldr r4, =_gd_nReady			@; Adreça del comptador de processos en estat Ready.
+		ldr r5, [r4]				@; Valor del comptador de processos en Ready.
+		ldr r6, =_gd_qReady			@; Adreça de la cua de processos en Ready.
+		strb r1, [r6, r5]			@; Guardem el sòcol en la cua de Ready.
+		add r5, r5, #1				@; Incrementem el valor del comptador de Ready.
+		str r5, [r4]				@; Guardem el valor del comptador.
+	
+		mov r0, #0					@; Retornem 0 per indicar que tot ha anat bé.
+		b .Lend			
+		
+		@; Codi de tirar error.
+		.Ldeny:
+			mov r0, #1				@; Codi d'error.
+			
+		.Lend:
+	pop {r4-r7, pc}
 
 
 	@; Rutina para terminar un proceso de usuario:
