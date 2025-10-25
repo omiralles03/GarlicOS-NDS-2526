@@ -142,35 +142,29 @@ void _gg_procesarFormato(char *formato, unsigned int val1, unsigned int val2,
         else {
             j++;
             char codi = formato[j]; // (c, d, x, s, %)
-            
-            // Si no es tracta de % i encara no s'han usat
-            // els dos valors, determinar el valor a usar.
+
             unsigned int val_act = 0;
-            if (codi != '%' && val_cmp < 2) { 
-                val_act = (val_cmp == 0) ? val1 : val2;
-            }
+            // Si no es tracta de %
+            if (codi != '%') {
+				// Si no s'han els dos valors, determinar el valor a usar.
+				if (val_cmp < 2) {
+					val_act = (val_cmp == 0) ? val1 : val2;
+				}
+				// En cas contrari ignorar el codi de format
+				else {
+					codi = 0; // codi erroni
+				}
+			}
 
             switch (codi) {
                 case 'c':
-                    if (val_cmp < 2) {
-                        resultado[i] = (char)val_act;
-                        i++;
-                        val_cmp++;
-                    }
+					resultado[i] = (char)val_act;
+					i++;
+					val_cmp++;
                     break;
 
-                // Decimal o Hexa
                 case 'd':
-                case 'x':
-                    // TODO: Mirar si es necessari comprovar el codi
-                    // de retorn de _gs_num2str 0=be, 1=error.
-                    if (val_cmp < 2) {
-                        if (codi == 'd') {
-                            _gs_num2str_dec(val_tmp, sizeof(val_tmp), val_act);
-                        } else { // 'x'
-                            _gs_num2str_hex(val_tmp, sizeof(val_tmp), val_act);
-                        }
-                    }
+					_gs_num2str_dec(val_tmp, sizeof(val_tmp), val_act);
                     // Guardar el valor transcrit
                     for (int k = 0; val_tmp[k] != '\0'; k++) {
                         if (val_tmp[k] != ' ') { // No guardar espais en blanc
@@ -178,23 +172,40 @@ void _gg_procesarFormato(char *formato, unsigned int val1, unsigned int val2,
                             i++;
                         }
                     }
-                    val_cmp++;
-                    break;
-
-                case 's':
-                    if (val_cmp < 2) {
-                        char *string_ptr = (char *)val_act;
-                         
-                        for (int k = 0; string_ptr[k] != '\0'; k++) {
-                            resultado[i] = string_ptr[k];
+					val_cmp++;
+					break;
+                case 'x':
+					_gs_num2str_hex(val_tmp, sizeof(val_tmp), val_act);
+                    // Guardar el valor transcrit
+                    for (int k = 0; val_tmp[k] != '\0'; k++) {
+                        if (val_tmp[k] != '0') { // No guardar espais en blanc
+                            resultado[i] = val_tmp[k];
                             i++;
                         }
                     }
-                    val_cmp++;
-                    break;
+					val_cmp++;
+					break;
+                case 's':
+					{ // scope error fix per string_ptr
+						char *string_ptr = (char *)val_act;
+
+						for (int k = 0; string_ptr[k] != '\0'; k++) {
+							resultado[i] = string_ptr[k];
+							i++;
+						}
+						val_cmp++;
+					}
+					break;
 
                 case '%':
                     resultado[i] = '%';
+                    i++;
+                    break;
+
+				default:
+					resultado[i] = '%';
+                    i++;
+					resultado[i] = formato[j];
                     i++;
                     break;
             }
@@ -235,6 +246,7 @@ void _gg_escribir(char *formato, unsigned int val1, unsigned int val2,
     char character;
 
     while ((character = resultado[i]) != '\0') {
+
         // Tabulacio
         if (character == '\t') {
             // Escriure espais fins la proxima columna en pos % 4
@@ -243,8 +255,13 @@ void _gg_escribir(char *formato, unsigned int val1, unsigned int val2,
                 numChars++;
             } while ((numChars < VCOLS) && (numChars % 4 != 0));
         }
-        // Salt de linia o buffer ple
-        else if (character == '\n' || numChars == VCOLS) {
+		// Caracter literal
+        else if(character != '\n' || numChars < VCOLS) {
+            _gd_wbfs[ventana].pChars[numChars] = character;
+            numChars++;
+        }
+        // Salt de linia
+        if (character == '\n' || numChars == VCOLS) {
             swiWaitForVBlank();
             // Scroll si arribem al final
             if (filaAct == VFILS - 1) {
@@ -258,11 +275,6 @@ void _gg_escribir(char *formato, unsigned int val1, unsigned int val2,
                 filaAct++;
             }
         }
-        // Caracter literal
-        else {
-            _gd_wbfs[ventana].pChars[numChars] = character;
-            numChars++;
-        }
 
         // Actualitzar pControl per el proxim _gg_escribir()
         // Posar num linia a 16 bits alts 
@@ -270,23 +282,5 @@ void _gg_escribir(char *formato, unsigned int val1, unsigned int val2,
         _gd_wbfs[ventana].pControl = (filaAct << 16) | numChars;
 		
         i++; // seguent caracter
-    }
-	
-	// Si queden caracters al buffer i no hem 
-	// arribat al final de linea o no hi ha \n
-	if (numChars > 0) {		
-		 swiWaitForVBlank();
-		// Scroll si arribem al final
-		if (filaAct == VFILS - 1) {
-			_gg_desplazar(ventana);
-		}
-		// Escriure Linia i reiniciar numChars
-		_gg_escribirLinea(ventana, filaAct, numChars);
-		numChars = 0;
-		// Avancar fila si NO estem al final
-		if (filaAct < VFILS - 1) {
-			filaAct++;
-		}
-        _gd_wbfs[ventana].pControl = (filaAct << 16) | numChars;
     }
 }
