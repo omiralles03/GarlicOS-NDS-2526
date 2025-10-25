@@ -84,8 +84,8 @@ void _gg_iniGrafA() {
 
   // TileBase: 128 baldoses * 8x8 px/baldosa * 1 byte/px = 8KB
   // Offset tileBase (16KB) = 0 -> No arriba a solapar
-  bg2 = bgInit(2, BgType_ExRotation, BgSize_ER_512x512, 0, 0);
-  bg3 = bgInit(3, BgType_ExRotation, BgSize_ER_512x512, 4, 0);
+  bg2 = bgInit(2, BgType_ExRotation, BgSize_ER_512x512, 0, 3);
+  bg3 = bgInit(3, BgType_ExRotation, BgSize_ER_512x512, 4, 3);
 
   // Prioritat bg3 > bg2
   bgSetPriority(bg2, 1);
@@ -245,7 +245,7 @@ void _gg_escribir(char *formato, unsigned int val1, unsigned int val2,
         }
         // Salt de linia o buffer ple
         else if (character == '\n' || numChars == VCOLS) {
-            _gp_WaitForVBlank();
+            swiWaitForVBlank();
             // Scroll si arribem al final
             if (filaAct == VFILS - 1) {
                 _gg_desplazar(ventana);
@@ -268,7 +268,25 @@ void _gg_escribir(char *formato, unsigned int val1, unsigned int val2,
         // Posar num linia a 16 bits alts 
         // OR per 16 bits baixos dels caracters pendents
         _gd_wbfs[ventana].pControl = (filaAct << 16) | numChars;
-
+		
         i++; // seguent caracter
+    }
+	
+	// Si queden caracters al buffer i no hem 
+	// arribat al final de linea o no hi ha \n
+	if (numChars > 0) {		
+		 swiWaitForVBlank();
+		// Scroll si arribem al final
+		if (filaAct == VFILS - 1) {
+			_gg_desplazar(ventana);
+		}
+		// Escriure Linia i reiniciar numChars
+		_gg_escribirLinea(ventana, filaAct, numChars);
+		numChars = 0;
+		// Avancar fila si NO estem al final
+		if (filaAct < VFILS - 1) {
+			filaAct++;
+		}
+        _gd_wbfs[ventana].pControl = (filaAct << 16) | numChars;
     }
 }
