@@ -40,7 +40,7 @@ _gg_escribirLinea:
         mov r5, #VFILS
         mul r5, r4, r5          @; R5 = fila * VFILS
         mov r6, #PCOLS
-        mul r5, r5, r6          @; R5 = (fila * VFILS) * PCOLS
+        mul r5, r6, r5          @; R5 = (fila * VFILS) * PCOLS
         mov r6, #VCOLS
         mla r5, r3, r6, r5      @; R5 =  (columna * VCOLS) + (fila * VFILS * PCOLS)
 
@@ -49,8 +49,7 @@ _gg_escribirLinea:
         mla r5, r1, r6, r5      @; R5 = Pos. ini V + (fila * PCOLS)
 
         @; Obtenir la direccio on es vol escriure en la VRAM
-        ldr r3, =bg2map
-        ldr r3, [r3]            @; Carregar adreca base VRAM (0x06000000)
+        ldr r3, =0x06000000		@; Carregar adreca base VRAM (0x06000000)
         lsl r5, #1              @; R5 *= 2 (cada baldosa son 2 bytes (halfword))
         add r3, r5              @; R3 = VRAM = bg2 + Offset f en V
 
@@ -71,7 +70,7 @@ _gg_escribirLinea:
         sub r6, #32             @; Convertir ASCII a index Baldosa
         strh r6, [r3]           @; Guardar baldosa a VRAM[R3]
         
-        add r3, #L2_PPART       @; Incrementar VRAM
+        add r3, #2       		@; Incrementar VRAM (2 bytes)
         add r5, #1              @; Incrementar index chars
         b .Lloop
 
@@ -85,10 +84,74 @@ _gg_escribirLinea:
 	@;Parámetros:
 	@;	R0: ventana a desplazar (int v)
 _gg_desplazar:
-	push {lr}
+	push {r1-r7, lr}
 
+        and r1, r0, #L2_PPART   @; R1 = columna = v % PPART
+        lsr r2, r0, #L2_PPART   @; R2 = fila = v / PPART
 
-	pop {pc}
+        @; Posicio inicial de V = (fila * VFILS * PCOLS) + (columna * VCOLS)
+        mov r3, #VFILS
+        mul r3, r2, r3          @; R3 = fila * VFILS
+        mov r4, #PCOLS
+        mul r3, r4, r3          @; R3 = (fila * VFILS) * PCOLS
+        mov r4, #VCOLS
+        mla r3, r1, r4, r3      @; R3 =  (columna * VCOLS) + (fila * VFILS * PCOLS)
+
+        @; Obtenir la direccio de la VRAM
+        ldr r1, =0x06000000		@; Carregar adreca base VRAM (0x06000000)    
+        lsl r3, #1              @; R3 *= 2 (cada baldosa son 2 bytes (halfword))
+        add r1, r3              @; R1 = VRAM = bg2 + Offset V
+
+        @; Punters per el scroll
+        mov r4, #PCOLS
+        lsl r4, #1              @; R4 = PCOLS * 2 (Salt de linia en bytes)
+
+        add r2, r1, r4          @; R2 = Fila Origen (Fila i+1)
+                                @; R1 = Fila Desti (Fila i)
+        
+        mov r3, #VFILS
+        sub r3, #1              @; R3 = Delimitant de Files (VFILS - 1)
+
+    .Lscroll_LineLoop:
+        cmp r3, #0
+        ble .Lclear_LastLine    @; Si R3 = 0 s'han copiat totes les linies
+
+        mov r5, #0              @; R5 = index columna
+        mov r6, #VCOLS          @; R6 = index columnes restants
+
+    .Lscroll_CopyLoop:
+        cmp r6, #0
+        ble .Lscroll_CopyEnd    @; Si R6 = 0 s'ha copiat la linia actual
+
+        ldrh r7, [r2, r5]       @; R7 = Halfword Origen (Fila i+1)
+        strh r7, [r1, r5]       @; Guardar Halfword al Desti (Fila i)
+
+        add r5, #2              @; R5 = seguent columna (2 bytes)
+        sub r6, #1              @; Decrementar comptador de columnes
+        b .Lscroll_CopyLoop
+
+    .Lscroll_CopyEnd:
+        add r1, r4              @; R1 = avancar Desti (Fila i)
+        add r2, r4              @; R2 = avancar Origen (Fila i+1)
+        sub r3, #1              @; Decrementar comptador de linies
+        b .Lscroll_LineLoop
+
+    .Lclear_LastLine:
+        mov r3, #0              @; R3 = Espai Blanc
+        mov r5, #0              @; R5 = index columna
+        mov r6, #VCOLS          @; R6 = index columnes restants
+        
+    .Lclear_Loop:
+        cmp r6, #0
+        ble .Lend_scroll
+
+        strh r3, [r1, r5]       @; Escriure espai blanc en la columna
+        add r5, #2              @; R5 = seguent columna (2 bytes)
+        sub r6, #1              @; Decrementar comptador de columnes
+        b .Lclear_Loop
+
+    .Lend_scroll:
+	pop {r1-r7, pc}
 
 
 .end
