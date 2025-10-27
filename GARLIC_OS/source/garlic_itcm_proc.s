@@ -82,28 +82,28 @@ _gp_rsiVBL:
 		beq .Lfinal					@; Si no hi han processos a la cua, finalitzem la RSI.
 		
 		@; Comprovar si el procés no és del S.O i el seu PID és 0.
-		ldr r4, =_gd_pidz			@; Carreguem adreça de la variable PID i sòcol del procés actual
-		ldr r4, [r4]				@; Carreguem el valor de la variable PIDZ
+		ldr r4, =_gd_pidz			@; Carreguem adreça de la variable PID i sòcol del procés actual.
+		ldr r4, [r4]				@; Carreguem el valor de la variable PIDZ.
 		cmp r4, #0					@; Si PIDZ = 0, és el sistema operatiu -> Salvem el seu estat.
 		beq .LsalvarProces			
-		mov r4, r4, lsr #4			@; Aillem els 28 bits alts del PID
+		mov r4, r4, lsr #4			@; Aillem els 28 bits alts del PID.
 		cmp r4, #0					@; Si el PID és 0, el procés ha acabat -> Restaurem el següent procés.
 		beq .LrestaurarProces
 		
 		@; Crida a la funció de salvar l'estat del procés.
 		.LsalvarProces:
-		ldr r4, =_gd_nReady			@; Preparem els paràmetres per la crida a _gp_salvarProc
+		ldr r4, =_gd_nReady			@; Preparem els paràmetres per la crida a _gp_salvarProc.
 		ldr r5, [r4]
 		ldr r6, = _gd_pidz
-		bl _gp_salvarProc			@; Cridem la funció _gp_salvarProc
+		bl _gp_salvarProc			@; Cridem la funció _gp_salvarProc.
 		str r5, [r4]				@; Guardem el valor actualitzat del nombre de processos a la cua Ready.
 		
 		@; Crida a la funció de restaurar l'estat del procés.
 		.LrestaurarProces:
-		ldr r4, =_gd_nReady			@; Preparem els paràmetres per la crida a _gp_restaurarProc
+		ldr r4, =_gd_nReady			@; Preparem els paràmetres per la crida a _gp_restaurarProc.
 		ldr r5, [r4]
 		ldr r6, = _gd_pidz
-		bl _gp_restaurarProc		@; Cridem la funció _gp_restaurarProc
+		bl _gp_restaurarProc		@; Cridem la funció _gp_restaurarProc.
 		
 		
 	.Lfinal:
@@ -381,18 +381,18 @@ _gp_crearProc:
 	@; de multiplexación de procesos no salve el estado del proceso terminado.
 _gp_terminarProc:
 	ldr r0, =_gd_pidz
-	ldr r1, [r0]			@; R1 = valor actual de PID + zócalo
-	and r1, r1, #0xf		@; R1 = zócalo del proceso desbancado
-	str r1, [r0]			@; guardar zócalo con PID = 0, para no salvar estado			
+	ldr r1, [r0]					@; R1 = valor actual de PID + zócalo
+	and r1, r1, #0xf				@; R1 = zócalo del proceso desbancado
+	str r1, [r0]					@; guardar zócalo con PID = 0, para no salvar estado			
 	ldr r2, =_gd_pcbs
 	mov r10, #24
 	mul r11, r1, r10
-	add r2, r11				@; R2 = dirección base _gd_pcbs[zocalo]
+	add r2, r11						@; R2 = dirección base _gd_pcbs[zocalo]
 	mov r3, #0
-	str r3, [r2]			@; pone a 0 el campo PID del PCB del proceso
+	str r3, [r2]					@; pone a 0 el campo PID del PCB del proceso
 .LterminarProc_inf:
-	bl _gp_WaitForVBlank	@; pausar procesador
-	b .LterminarProc_inf	@; hasta asegurar el cambio de contexto
+	bl _gp_WaitForVBlank			@; pausar procesador
+	b .LterminarProc_inf			@; hasta asegurar el cambio de contexto
 	
 .end
 
