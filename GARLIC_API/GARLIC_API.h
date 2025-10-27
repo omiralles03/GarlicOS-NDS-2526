@@ -53,5 +53,8 @@ extern int GARLIC_divmodL(long long * num, unsigned int * den,
 		(salto de línia). */
 extern void GARLIC_printf(char * format, ...);
 
+/* CABECERAS FUNCIONES ADICIONALES PROG M*/
+extern void * GARLIC_malloc(unsigned short size);
+int GARLIC_free(void * addr);
 
 #endif // _GARLIC_API_h_

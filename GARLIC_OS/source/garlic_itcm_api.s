@@ -133,5 +133,14 @@ _ga_printf:
 	pop {r4, pc}
 
 
+	.global _ga_malloc
+_ga_malloc:
+@;	push{, lr}
+@;	pop{, pc}
+	
+		.global _ga_free
+_ga_free:
+@;	push{, lr}
+@;	pop{, pc}
 .end
 
