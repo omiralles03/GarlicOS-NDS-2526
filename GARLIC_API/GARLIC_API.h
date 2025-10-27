@@ -53,5 +53,10 @@ extern int GARLIC_divmodL(long long * num, unsigned int * den,
 		(salto de línia). */
 extern void GARLIC_printf(char * format, ...);
 
+extern void GARLIC_spriteSet(unsigned char n, unsigned char icon);
+extern void GARLIC_spriteMove(unsigned char n, short px, short py);
+extern void GARLIC_spriteShow(unsigned char n);
+extern void GARLIC_spriteHide(unsigned char n);
+
 
 #endif // _GARLIC_API_h_

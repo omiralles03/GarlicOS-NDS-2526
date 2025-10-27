@@ -68,7 +68,19 @@ extern garlicWBUF _gd_wbfs[4];	// vector con los buffers de 4 ventanas
 
 extern int _gd_stacks[15*128];	// vector con las pilas de los procesos activos
 
+// Variables globals progG tareas adicionals
+typedef struct
+{
+    unsigned char icon;     // Icona (0-63)
+    unsigned char zocalo;   // Zocalo (0-15)
+    unsigned char n;        // Numero sprite (0-7)
+    unsigned char visible;  // Estat (0: ocult, 1: visible)
+    short px;               // Posicio X relativa (-32 a 256)
+    short py;               // Posicio Y relativa (-32 a 192)
 
+} PACKED garlicSPRITE;
+
+extern garlicSPRITE _gd_sprites[16*8]; // vector amb els 128 (16 * 8) PCBs de sprites
 
 
 //------------------------------------------------------------------------------
@@ -177,6 +189,10 @@ extern void _gg_escribir(char *formato, unsigned int val1, unsigned int val2,
 																   int ventana);
 
 
+extern void _gg_spriteSet(unsigned char n, unsigned char icon);
+extern void _gg_spriteMove(unsigned char n, short px, short py);
+extern void _gg_spriteShow(unsigned char n);
+extern void _gg_spriteHide(unsigned char n);
 //------------------------------------------------------------------------------
 //	Rutinas de soporte a la gestión de gráficos (garlic_itcm_graf.s)
 //------------------------------------------------------------------------------
