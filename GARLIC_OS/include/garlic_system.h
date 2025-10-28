@@ -5,7 +5,7 @@
 
 	Analista-programador: santiago.romani@urv.cat
 	Programador P: xxx.xxx@estudiants.urv.cat
-	Programador M: yyy.yyy@estudiants.urv.cat
+	Programador M: arnau.faura@estudiants.urv.cat
 	Programador G: zzz.zzz@estudiants.urv.cat
 	Programador T: uuu.uuu@estudiants.urv.cat
 
@@ -132,6 +132,12 @@ extern int _gm_initFS();
 		== 0	->	no se ha podido cargar el programa
 */
 extern intFunc _gm_cargarPrograma(char *keyName);
+
+/* _gm_do_malloc: funció auxiliar 1 progM per reservar memòria dinàmica per a un procés */
+extern void *_gm_do_malloc(unsigned int size, int zocalo);
+
+/* _gm_do_free: funció auxiliar 2 progM per alliberar memòria dinàmica d'un procés */
+extern int _gm_do_free(void *ptr, int zocalo);
 
 
 //------------------------------------------------------------------------------

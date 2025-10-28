@@ -23,6 +23,11 @@
 unsigned int dMem_lliure = INI_MEM;	//pos. mem. lliure dinàmicament ( suposem total segments < 24KB)
 										//inicialment valor carrega primer seg.
 
+//Array per guardar punters reservats per cada proces
+void *blocs_reservats[16][4] = { {NULL} };
+//Comptador de blocs reservats per a cada proces
+int num_blocs_reservats[16] = {0};
+
 //tipus de variables en .elf 
 typedef uint32_t Elf32_Addr;   // 4 bytes (direcció de mem.)
 typedef uint16_t Elf32_Half;   // 2 bytes (half int unsigned)
@@ -155,3 +160,43 @@ intFunc _gm_cargarPrograma(char *keyName)
 	//return ((intFunc) INI_MEM);
 }
 
+void *_gm_do_malloc(unsigned int size, int zocalo) {
+    if (zocalo < 0 || zocalo > 15 || num_blocs_reservats[zocalo] >= 4) {
+        return NULL; //límit superat o zócalo invàlid
+    }
+
+    void *ptr = malloc(size);
+    if (ptr == NULL) {
+        return NULL;
+    }
+
+    //marcar punter guardat
+    for (int i = 0; i < 4; i++) {
+        if (blocs_reservats[zocalo][i] == NULL) {
+            blocs_reservats[zocalo][i] = ptr;
+            num_blocs_reservats[zocalo]++;
+            return ptr; // Retornem el punter reservat
+        }
+    }
+	//per si de cas
+    free(ptr);
+    return NULL;
+}
+
+int _gm_do_free(void *ptr, int zocalo) {
+    if (zocalo < 0 || zocalo > 15 || ptr == NULL) {
+        return 0;
+    }
+
+    //buscar punter per "eliminar-lo"
+    for (int i = 0; i < 4; i++) {
+        if (blocs_reservats[zocalo][i] == ptr) {
+            free(ptr);
+            blocs_reservats[zocalo][i] = NULL;
+            num_blocs_reservats[zocalo]--;
+            return 1; // retorn positiu
+        }
+    }
+
+    return 0; // retorn error: el punter no pertanyia a aquest procés
+}
