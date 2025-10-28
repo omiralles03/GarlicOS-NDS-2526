@@ -95,6 +95,54 @@ int main(int argc, char **argv) {
 	else
 		printf("*** Programa \"TADD\" NO cargado\n");
 
+	//**** Proves per a MMLL ****
+	printf("\n*** Proves MMLL ***\n");
+	intFunc start_mmll;
+	//LA VERIFICACIÓ DE QUE EL MIN < MAX HA DE SER FETA VISUALMENT
+	
+	//execució única amb arg=1
+	int arg_mmll = 1;
+	printf("\n*** Carregant MMLL amb arg=%d (100^%d elements) ***\n", arg_mmll, arg_mmll + 1);
+	start_mmll = _gm_cargarPrograma("MMLL");
+	if (start_mmll) {
+		printf("Direccio arranque: %p\n", start_mmll);
+		printf("*** Pusle tecla \'START\' ::\n\n");
+		do {
+			swiWaitForVBlank();
+			scanKeys();
+		} while ((keysDown() & KEY_START) == 0);
+
+		start_mmll(arg_mmll); //exec. amb arg=1 (llista de 100^2 pos.)
+		printf("--- MMLL(arg=%d) finalitzat ---\n", arg_mmll);
+	} else {
+		printf("!!! ERROR carregant MMLL !!!\n");
+	}
+
+	//Execucions multiples amb arg=0
+	arg_mmll = 0;
+	int num_execucions_arg0 = 3; //3 exec. amb arg 0 (llista de 100^1 pos.)
+	printf("\n--- Executant MMLL %d cops amb arg=%d (100^%d elements) ---\n",
+			num_execucions_arg0, arg_mmll, arg_mmll + 1);
+
+	for (int i = 0; i < num_execucions_arg0; i++) {
+		printf("\n*** Carregant MMLL (Execució %d/%d amb arg=%d) ***\n", i + 1, num_execucions_arg0, arg_mmll);
+		start_mmll = _gm_cargarPrograma("MMLL");
+		if (start_mmll) {
+					printf("Direccio arranque: %p\n", start_mmll);
+					printf("*** Pusle tecla \'START\' ::\n\n");
+			do {
+				swiWaitForVBlank();
+				scanKeys();
+			} while ((keysDown() & KEY_START) == 0);
+
+			start_mmll(arg_mmll); // Executem amb arg=0
+			printf("MMLL(arg=%d, Exec. %d/%d) acabada ---\n", arg_mmll, i + 1, num_execucions_arg0);
+		} else {
+			printf("ERROR carregant MMLL (Execució %d/%d)\n", i + 1, num_execucions_arg0);
+			//si falla carregar, sortir bucle
+			break;
+		}
+	}
 
 	printf("*** Final fase 1_M\n");	
 	while (1)
