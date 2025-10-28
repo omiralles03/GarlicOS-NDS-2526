@@ -89,7 +89,8 @@ int main(int argc, char **argv) {
 			scanKeys();
 		} while ((keysDown() & KEY_START) == 0);
 
-		start(0);
+		int num_errors = start(0);
+		printf("num. errors: %d\n", num_errors);
 	}
 	else
 		printf("*** Programa \"TADD\" NO cargado\n");

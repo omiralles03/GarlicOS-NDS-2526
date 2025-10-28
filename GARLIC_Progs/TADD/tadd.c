@@ -11,6 +11,7 @@
 
 int _start(int arg)
 {
+	int num_errors = 0;	//contador errors
 	void *p[5]; // Array per guardar fins a 5 punters (l'últim ha de fallar)
 	int i;
 	int pid = GARLIC_pid(); // Obtenim el PID per als missatges
@@ -28,6 +29,7 @@ int _start(int arg)
 			*((char*)p[i]) = (char)('A' + i);
 		} else {
 			GARLIC_printf("ERROR: No s'ha pogut reservar el bloc %d (%d bytes)\n", i, mida);
+			num_errors+=1;
 		}
 	}
 
@@ -38,6 +40,7 @@ int _start(int arg)
 		GARLIC_printf("  OK: El 5è malloc ha retornat 0 com s'esperava.\n");
 	} else {
 		GARLIC_printf("  ERROR: El 5è malloc ha retornat un punter (%x)! No hauria de poder.\n", (unsigned int)p[4]);
+		num_errors+=1;
 		// Si per error s'ha reservat, l'alliberem
 		GARLIC_free(p[4]);
 	}
@@ -51,6 +54,7 @@ int _start(int arg)
 			p[1] = 0; // Marquem el punter com a alliberat
 		} else {
 			GARLIC_printf("ERROR: GARLIC_free() ha fallat per al bloc 1.\n");
+			num_errors+=1;
 		}
 	} else {
 		GARLIC_printf("INFO: Bloc 1 no estava reservat, no es pot alliberar.\n");
@@ -64,6 +68,7 @@ int _start(int arg)
 		*((char*)p[4]) = 'Z'; //prova escriptura
 	} else {
 		GARLIC_printf("ERROR: No s'ha pogut reservar el nou bloc després de free.\n");
+		num_errors+=1;
 	}
 
 	//Intent alliberar un punter invàlid (adreça random)
@@ -73,6 +78,7 @@ int _start(int arg)
 		GARLIC_printf("OK: GARLIC_free() ha retornat 0 per a punter invàlid.\n");
 	} else {
 		GARLIC_printf("ERROR: GARLIC_free() no ha detectat un punter invàlid.\n");
+		num_errors+=1;
 	}
 
 	//Alliberar la resta de blocs
@@ -83,10 +89,11 @@ int _start(int arg)
 				GARLIC_printf("Bloc a %x alliberat.\n", (unsigned int)p[i]);
 			} else {
 				GARLIC_printf("ERROR alliberant bloc a %x.\n", (unsigned int)p[i]);
+				num_errors+=1;
 			}
 		}
 	}
 
 	GARLIC_printf("-- Fi Programa TADD - PID (%d) --\n", pid);
-	return 0;
+	return num_errors;
 }

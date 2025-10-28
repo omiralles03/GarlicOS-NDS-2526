@@ -88,78 +88,83 @@
 	.fpu softvfp
 	.type	_start, %function
 _start:
-	@ args = 0, pretend = 0, frame = 48
+	@ args = 0, pretend = 0, frame = 56
 	@ frame_needed = 0, uses_anonymous_args = 0
 	str	lr, [sp, #-4]!
-	sub	sp, sp, #52
+	sub	sp, sp, #60
 	str	r0, [sp, #4]
+	mov	r3, #0
+	str	r3, [sp, #52]
 	bl	GARLIC_pid
-	str	r0, [sp, #40]
-	ldr	r1, [sp, #40]
+	str	r0, [sp, #44]
+	ldr	r1, [sp, #44]
 	ldr	r0, .L21
 	bl	GARLIC_printf
 	ldr	r0, .L21+4
 	bl	GARLIC_printf
 	mov	r3, #0
-	str	r3, [sp, #44]
+	str	r3, [sp, #48]
 	b	.L2
 .L5:
-	ldr	r3, [sp, #44]
+	ldr	r3, [sp, #48]
 	add	r2, r3, #1
 	mov	r3, r2
 	lsl	r3, r3, #2
 	add	r3, r3, r2
 	lsl	r3, r3, #1
-	str	r3, [sp, #36]
-	ldr	r3, [sp, #36]
+	str	r3, [sp, #40]
+	ldr	r3, [sp, #40]
 	lsl	r3, r3, #16
 	lsr	r3, r3, #16
 	mov	r0, r3
 	bl	GARLIC_malloc
 	mov	r2, r0
-	ldr	r3, [sp, #44]
+	ldr	r3, [sp, #48]
 	lsl	r3, r3, #2
-	add	r1, sp, #48
+	add	r1, sp, #56
 	add	r3, r1, r3
-	str	r2, [r3, #-40]
-	ldr	r3, [sp, #44]
+	str	r2, [r3, #-44]
+	ldr	r3, [sp, #48]
 	lsl	r3, r3, #2
-	add	r2, sp, #48
+	add	r2, sp, #56
 	add	r3, r2, r3
-	ldr	r3, [r3, #-40]
+	ldr	r3, [r3, #-44]
 	cmp	r3, #0
 	beq	.L3
-	ldr	r3, [sp, #44]
+	ldr	r3, [sp, #48]
 	lsl	r3, r3, #2
-	add	r2, sp, #48
+	add	r2, sp, #56
 	add	r3, r2, r3
-	ldr	r3, [r3, #-40]
-	ldr	r2, [sp, #36]
-	ldr	r1, [sp, #44]
+	ldr	r3, [r3, #-44]
+	ldr	r2, [sp, #40]
+	ldr	r1, [sp, #48]
 	ldr	r0, .L21+8
 	bl	GARLIC_printf
-	ldr	r3, [sp, #44]
+	ldr	r3, [sp, #48]
 	lsl	r3, r3, #2
-	add	r2, sp, #48
+	add	r2, sp, #56
 	add	r3, r2, r3
-	ldr	r3, [r3, #-40]
-	ldr	r2, [sp, #44]
+	ldr	r3, [r3, #-44]
+	ldr	r2, [sp, #48]
 	and	r2, r2, #255
 	add	r2, r2, #65
 	and	r2, r2, #255
 	strb	r2, [r3]
 	b	.L4
 .L3:
-	ldr	r2, [sp, #36]
-	ldr	r1, [sp, #44]
+	ldr	r2, [sp, #40]
+	ldr	r1, [sp, #48]
 	ldr	r0, .L21+12
 	bl	GARLIC_printf
-.L4:
-	ldr	r3, [sp, #44]
+	ldr	r3, [sp, #52]
 	add	r3, r3, #1
-	str	r3, [sp, #44]
+	str	r3, [sp, #52]
+.L4:
+	ldr	r3, [sp, #48]
+	add	r3, r3, #1
+	str	r3, [sp, #48]
 .L2:
-	ldr	r3, [sp, #44]
+	ldr	r3, [sp, #48]
 	cmp	r3, #3
 	ble	.L5
 	ldr	r0, .L21+16
@@ -167,44 +172,50 @@ _start:
 	mov	r0, #50
 	bl	GARLIC_malloc
 	mov	r3, r0
-	str	r3, [sp, #24]
-	ldr	r3, [sp, #24]
+	str	r3, [sp, #28]
+	ldr	r3, [sp, #28]
 	cmp	r3, #0
 	bne	.L6
 	ldr	r0, .L21+20
 	bl	GARLIC_printf
 	b	.L7
 .L6:
-	ldr	r3, [sp, #24]
+	ldr	r3, [sp, #28]
 	mov	r1, r3
 	ldr	r0, .L21+24
 	bl	GARLIC_printf
-	ldr	r3, [sp, #24]
+	ldr	r3, [sp, #52]
+	add	r3, r3, #1
+	str	r3, [sp, #52]
+	ldr	r3, [sp, #28]
 	mov	r0, r3
 	bl	GARLIC_free
 .L7:
-	ldr	r3, [sp, #12]
+	ldr	r3, [sp, #16]
 	mov	r1, r3
 	ldr	r0, .L21+28
 	bl	GARLIC_printf
-	ldr	r3, [sp, #12]
+	ldr	r3, [sp, #16]
 	cmp	r3, #0
 	beq	.L8
-	ldr	r3, [sp, #12]
+	ldr	r3, [sp, #16]
 	mov	r0, r3
 	bl	GARLIC_free
-	str	r0, [sp, #32]
-	ldr	r3, [sp, #32]
+	str	r0, [sp, #36]
+	ldr	r3, [sp, #36]
 	cmp	r3, #0
 	beq	.L9
 	ldr	r0, .L21+32
 	bl	GARLIC_printf
 	mov	r3, #0
-	str	r3, [sp, #12]
+	str	r3, [sp, #16]
 	b	.L11
 .L9:
 	ldr	r0, .L21+36
 	bl	GARLIC_printf
+	ldr	r3, [sp, #52]
+	add	r3, r3, #1
+	str	r3, [sp, #52]
 	b	.L11
 .L8:
 	ldr	r0, .L21+40
@@ -215,28 +226,31 @@ _start:
 	mov	r0, #15
 	bl	GARLIC_malloc
 	mov	r3, r0
-	str	r3, [sp, #24]
-	ldr	r3, [sp, #24]
+	str	r3, [sp, #28]
+	ldr	r3, [sp, #28]
 	cmp	r3, #0
 	beq	.L12
-	ldr	r3, [sp, #24]
+	ldr	r3, [sp, #28]
 	mov	r1, r3
 	ldr	r0, .L21+48
 	bl	GARLIC_printf
-	ldr	r3, [sp, #24]
+	ldr	r3, [sp, #28]
 	mov	r2, #90
 	strb	r2, [r3]
 	b	.L13
 .L12:
 	ldr	r0, .L21+52
 	bl	GARLIC_printf
+	ldr	r3, [sp, #52]
+	add	r3, r3, #1
+	str	r3, [sp, #52]
 .L13:
 	ldr	r0, .L21+56
 	bl	GARLIC_printf
 	ldr	r0, .L21+60
 	bl	GARLIC_free
-	str	r0, [sp, #28]
-	ldr	r3, [sp, #28]
+	str	r0, [sp, #32]
+	ldr	r3, [sp, #32]
 	cmp	r3, #0
 	bne	.L14
 	ldr	r0, .L21+64
@@ -245,62 +259,68 @@ _start:
 .L14:
 	ldr	r0, .L21+68
 	bl	GARLIC_printf
+	ldr	r3, [sp, #52]
+	add	r3, r3, #1
+	str	r3, [sp, #52]
 .L15:
 	ldr	r0, .L21+72
 	bl	GARLIC_printf
 	mov	r3, #0
-	str	r3, [sp, #44]
+	str	r3, [sp, #48]
 	b	.L16
 .L19:
-	ldr	r3, [sp, #44]
+	ldr	r3, [sp, #48]
 	lsl	r3, r3, #2
-	add	r2, sp, #48
+	add	r2, sp, #56
 	add	r3, r2, r3
-	ldr	r3, [r3, #-40]
+	ldr	r3, [r3, #-44]
 	cmp	r3, #0
 	beq	.L17
-	ldr	r3, [sp, #44]
+	ldr	r3, [sp, #48]
 	lsl	r3, r3, #2
-	add	r2, sp, #48
+	add	r2, sp, #56
 	add	r3, r2, r3
-	ldr	r3, [r3, #-40]
+	ldr	r3, [r3, #-44]
 	mov	r0, r3
 	bl	GARLIC_free
 	mov	r3, r0
 	cmp	r3, #0
 	beq	.L18
-	ldr	r3, [sp, #44]
+	ldr	r3, [sp, #48]
 	lsl	r3, r3, #2
-	add	r2, sp, #48
+	add	r2, sp, #56
 	add	r3, r2, r3
-	ldr	r3, [r3, #-40]
+	ldr	r3, [r3, #-44]
 	mov	r1, r3
 	ldr	r0, .L21+76
 	bl	GARLIC_printf
 	b	.L17
 .L18:
-	ldr	r3, [sp, #44]
+	ldr	r3, [sp, #48]
 	lsl	r3, r3, #2
-	add	r2, sp, #48
+	add	r2, sp, #56
 	add	r3, r2, r3
-	ldr	r3, [r3, #-40]
+	ldr	r3, [r3, #-44]
 	mov	r1, r3
 	ldr	r0, .L21+80
 	bl	GARLIC_printf
-.L17:
-	ldr	r3, [sp, #44]
+	ldr	r3, [sp, #52]
 	add	r3, r3, #1
-	str	r3, [sp, #44]
+	str	r3, [sp, #52]
+.L17:
+	ldr	r3, [sp, #48]
+	add	r3, r3, #1
+	str	r3, [sp, #48]
 .L16:
-	ldr	r3, [sp, #44]
+	ldr	r3, [sp, #48]
 	cmp	r3, #4
 	ble	.L19
-	ldr	r1, [sp, #40]
+	ldr	r1, [sp, #44]
 	ldr	r0, .L21+84
 	bl	GARLIC_printf
-	mov	r3, #0
+	ldr	r3, [sp, #52]
 	mov	r0, r3
-	add	sp, sp, #52
+	add	sp, sp, #60
 	@ sp needed
 	ldr	pc, [sp], #4
 .L22:
