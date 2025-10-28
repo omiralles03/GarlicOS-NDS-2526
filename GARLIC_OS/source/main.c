@@ -76,8 +76,26 @@ int main(int argc, char **argv) {
 	else
 		printf("*** Programa \"PRNT\" NO cargado\n");
 
-	printf("*** Final fase 1_M\n");
+	printf("\n\n\n*** Carga de programa TADD.elf\n");
+	printf("Prueba func. adicionales malloc y free\n");
+	start = _gm_cargarPrograma("TADD");
+	if (start)
+	{
+		printf("*** Direccion de arranque :\n\t\t%p\n", start);
+		printf("*** Pusle tecla \'START\' ::\n\n");
+		do
+		{
+			swiWaitForVBlank();
+			scanKeys();
+		} while ((keysDown() & KEY_START) == 0);
 
+		start(0);
+	}
+	else
+		printf("*** Programa \"TADD\" NO cargado\n");
+
+
+	printf("*** Final fase 1_M\n");	
 	while (1)
 	{
 		swiWaitForVBlank();
