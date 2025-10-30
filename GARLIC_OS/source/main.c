@@ -15,6 +15,9 @@
 #include <Sprites_sopo.h>
 
 extern int * punixTime;		// puntero a zona de memoria con el tiempo real
+void pruevas_progG();
+void check_params(int zocalo, unsigned char n, unsigned char icon, 
+	short px, short py, unsigned visible);
 
 /* Inicializaciones generales del sistema Garlic */
 //------------------------------------------------------------------------------
@@ -96,7 +99,7 @@ int main(int argc, char **argv) {
 	_gg_escribir("********************************", 0, 0, 0);
 	_gg_escribir("*** Inicio fase GARLIC\n", 0, 0, 0);
 
-	
+	pruevas_progG();
 	cargarPrograma("PRNT", 5, 1);
 	cargarPrograma("DNIF", 0, 2);
 	cargarPrograma("COLZ", 0, 3);
@@ -108,4 +111,209 @@ int main(int argc, char **argv) {
 		_gp_WaitForVBlank();
 	}
 	return 0;
+}
+
+//------------------------------------------------------------------------------
+// JOC DE PROVES PROG G - SPRITES
+//------------------------------------------------------------------------------
+// Rutina per veure els parametres dels sprites
+void check_params(int zocalo, unsigned char n, unsigned char icon, 
+	short px, short py, unsigned visible)
+{
+	int idx_global = (zocalo * MAX_SPRITE_PROC) + n;
+	_gg_escribir("\n\n> Zocalo: %d - %d", zocalo, _gd_sprites[idx_global].zocalo, zocalo);
+	_gg_escribir("\n> Sprite idx: %d - %d", n, _gd_sprites[idx_global].n, zocalo);
+	_gg_escribir("\n> Icon: %d - %d", icon, _gd_sprites[idx_global].icon, zocalo);
+	_gg_escribir("\n> Pos. : [%d,%d] - ", px, py, zocalo);
+	_gg_escribir("[%d,%d]", _gd_sprites[idx_global].px, _gd_sprites[idx_global].py, zocalo);
+	_gg_escribir("\n> Visib. %d - %d", visible, _gd_sprites[idx_global].visible, zocalo);
+}
+
+void pruevas_progG()
+{
+	unsigned char n, icon, visible;
+	short px, py;
+	int zocalo;
+	
+	// ------- Prueba 1: Posiciones -------
+	zocalo = 0;
+	_gg_escribir("\n\n*** Prueba 1\n", 0, 0, zocalo);
+	_gg_escribir("\n\n* Valor Esperado - Vector *\n", 0, 0, zocalo);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+		
+	n = 0; icon = 0; px = 48; py = 32; visible = 1;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
+	check_params(zocalo, n, icon, px, py, visible);
+	for (int i = 0; i < 75; i++)
+		_gp_WaitForVBlank();
+		
+	n = 1; icon = 1; px = 176; py = 32; visible = 1;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
+	check_params(zocalo, n, icon, px, py, visible);
+	for (int i = 0; i < 75; i++)
+		_gp_WaitForVBlank();
+		
+	n = 2; icon = 2; px = 48; py = 80; visible = 1;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
+	check_params(zocalo, n, icon, px, py, visible);
+	for (int i = 0; i < 75; i++)
+		_gp_WaitForVBlank();
+		
+	n = 3; icon = 3; px = -300; py = 300; visible = 1;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
+	check_params(zocalo, n, icon, px, py, visible);
+	for (int i = 0; i < 75; i++)
+		_gp_WaitForVBlank();
+		
+	// Mover sprite 0 a la pos 0,0
+	n = 0; px = 0; py = 0; visible = 1;
+	_gg_spriteMove(n, px, py, zocalo);
+	check_params(zocalo, n, icon, px, py, visible);
+	_gg_escribir("\n\n*** Fin Prueba 1\n", 0, 0, zocalo);
+	
+	for (int i = 0; i < 75; i++)
+		_gp_WaitForVBlank();
+		
+	_gg_spriteHide(0, zocalo);
+	_gg_spriteHide(1, zocalo);
+	_gg_spriteHide(2, zocalo);
+	_gg_spriteHide(3, zocalo);
+	
+	// ------- Prueba 2: Movimiento -------
+	zocalo = 1;
+	_gg_escribir("\n\n*** Prueba 2\n", 0, 0, zocalo);
+	_gg_escribir("\n\n* Valor Esperado - Vector *\n", 0, 0, zocalo);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+	
+	n = 4; icon = 10; px = 48; py = 32; visible = 1;
+	int idx_global = (zocalo * 8) + n;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
+	check_params(zocalo, n, icon, px, py, visible);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+	
+	short dir = 2;
+	for (int i = 0; i < 60; i++) {
+		if (i%10 == 0) {
+			dir = -dir;
+		}
+		py += dir;
+		_gg_spriteMove(n, px, py, zocalo);
+		_gg_escribir("\n> Pos. : [%d,%d] - ", px, py, zocalo);
+		_gg_escribir("[%d,%d]", _gd_sprites[idx_global].px, _gd_sprites[idx_global].py, zocalo);
+	}
+	
+	_gg_escribir("\n\n*** Fin Prueba 2\n", 0, 0, zocalo);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+	_gg_spriteHide(n, zocalo);	
+	
+	// ------- Prueba 3: Cambio de indice -------
+	zocalo = 2;
+	_gg_escribir("\n\n*** Prueba 3\n", 0, 0, zocalo);	
+	_gg_escribir("\n\n* Valor Esperado - Vector *\n", 0, 0, zocalo);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+		
+	n = 5; icon = 12; px = 48; py = 32; visible = 1;
+	idx_global = (zocalo * 8) + n;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
+	check_params(zocalo, n, icon, px, py, visible);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+	
+	for (int i = 0; i < 300; i++) {
+		if (i%60 == 0 && i != 0) {
+			icon++;
+			_gg_spriteSet(n, icon, zocalo);
+			_gg_spriteShow(n, zocalo);
+			_gg_escribir("\n> Icon: %d - %d\n", icon, _gd_sprites[idx_global].icon, zocalo);
+			for (int i = 0; i < 50; i++)
+				_gp_WaitForVBlank();
+			
+		}
+	}
+	
+	_gg_escribir("\n\n*** Fin Prueba 3\n", 0, 0, zocalo);
+	
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+		
+	_gg_spriteHide(n, zocalo);
+
+	// ------- Prueba 4: Movimiento en region -------
+	zocalo = 3;
+	_gg_escribir("\n\n*** Prueba 4\n", 0, 0, zocalo);
+	_gg_escribir("\n\n* Valor Esperado - Vector *\n", 0, 0, zocalo);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+	
+	// Ventana
+	short maxX = 128 - 32;
+	short maxY = 96 - 32;
+	short minX = 0;
+	short minY = 0;
+	short dirX = 2;
+	short dirY = 1;
+	
+	n = 6; icon = 3; px = minX; py = minY; visible = 1;
+	idx_global = (zocalo * 8) + n;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
+	check_params(zocalo, n, icon, px, py, visible);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+	
+	for (int i = 0; i < 200; i++) {
+		// VENTANA
+		px += dirX;
+		py += dirY;
+		
+		if (px >= maxX) {
+			px = maxX;
+			dirX = -dirX;
+		} else if (px <= minX) {
+			px = minX;
+			dirX = -dirX;
+		}
+		
+		if (py >= maxY) {
+			py = maxY;
+			dirY = -dirY;
+		} else if (py <= minY) {
+			py = minY;
+			dirY = -dirY;
+		}
+		_gg_spriteMove(n, px, py, zocalo);
+		_gg_escribir("\n> Pos. : [%d,%d] - ", px, py, zocalo);
+		_gg_escribir("[%d,%d]\n", _gd_sprites[idx_global].px, _gd_sprites[idx_global].py, zocalo);
+	}
+	
+	_gg_escribir("\n\n*** Fin Prueba 4\n", 0, 0, zocalo);
+	
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+		
+	_gg_spriteHide(n, zocalo);
+		
+	for (int i = 0; i < 4; i++) {
+		_gg_clearScreen(i);
+	}
+	for (int i = 0; i < 25; i++)
+		_gp_WaitForVBlank();
 }
