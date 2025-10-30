@@ -54,4 +54,14 @@ extern int GARLIC_divmodL(long long * num, unsigned int * den,
 extern void GARLIC_printf(char * format, ...);
 
 
+	/* GARLIC_send: envia una dada numèrica 'data' a la bústia amb índex 'n' */
+extern int GARLIC_send(unsigned char n, int data);
+
+
+	/* GARLIC_receive: rep una dada numèrica de la bústia amb índex 'n'.
+		Bloqueja al procés que l'ha cridat en cas que la bústia demanada
+		estigui buida en el moment de la crida. */
+extern int GARLIC_receive(unsigned char n);
+
+
 #endif // _GARLIC_API_h_

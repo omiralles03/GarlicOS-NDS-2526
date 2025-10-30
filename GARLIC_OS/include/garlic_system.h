@@ -4,10 +4,10 @@
 						rutinas del sistema operativo GARLIC (versión 1.0)
 
 	Analista-programador: santiago.romani@urv.cat
-	Programador P: xxx.xxx@estudiants.urv.cat
-	Programador M: yyy.yyy@estudiants.urv.cat
-	Programador G: zzz.zzz@estudiants.urv.cat
-	Programador T: uuu.uuu@estudiants.urv.cat
+	Programador P: anthonyjohn.cardenas@estudiants.urv.cat
+	Programador M: arnau.faura@estudiants.urv.cat
+	Programador G: oupman.miralles@estudiants.urv.cat
+	Programador T: nobody@estudiants.urv.cat
 
 ------------------------------------------------------------------------------*/
 #ifndef _GARLIC_SYSTEM_h
@@ -234,6 +234,25 @@ extern int _gs_num2str_hex(char * numstr, unsigned int length, unsigned int num)
 				memoria deben estar alineadas a word */
 extern void _gs_copiaMem(const void *source, void *dest, unsigned int numBytes);
 
+
+
+//------------------------------------------------------------------------------
+//	FUNCIONALITATS ADDICIONALS: Bústies (Mailboxes)
+//------------------------------------------------------------------------------
+
+#define MAILBOX_QUEUE_SIZE 16 // Mida de la cua de cada bústia
+
+// Estructura d'una bústia (Mailbox)
+typedef struct
+{
+	int queue[MAILBOX_QUEUE_SIZE];	// Cua de dades 
+	int head;						// Índex principi cua
+	int tail;						// Índex final cua
+	int count;						// Nombre de dades a la cua
+} PACKED garlicMailbox;
+
+// Vector global per a les 8 bústies
+extern garlicMailbox _gd_mailboxes[8];
 
 
 #endif // _GARLIC_SYSTEM_h

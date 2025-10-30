@@ -10,6 +10,10 @@
 	.arm
 	.align 2
 	
+	
+	MAILBOX_QUEUE_SIZE = 16
+	MAILBOX_STRUCT_SIZE = (MAILBOX_QUEUE_SIZE * 4) + 4 + 4 + 4
+	
 	.global _gp_WaitForVBlank
 	@; rutina para pausar el procesador mientras no se produzca una interrupción
 	@; de retrazado vertical (VBL); es un sustituto de la "swi #5", que evita
@@ -76,10 +80,10 @@ _gp_rsiVBL:
 		str r5, [r4]				@; Guardem el valor modificat.
 		
 		@; Comprovar si hi ha algun procés a la cua nReady.
-		ldr r6, =_gd_nReady			@; Carregum l'adreça de la variable de nombre de processos a la cua.
-		ldr r7, [r6]				@; Carreguem el valor de la variable.
-		cmp r7, #0					@; Mirem si hi han processos a la cua.
-		beq .Lfinal					@; Si no hi han processos a la cua, finalitzem la RSI.
+		@;ldr r6, =_gd_nReady			@; Carregum l'adreça de la variable de nombre de processos a la cua.
+		@;ldr r7, [r6]				@; Carreguem el valor de la variable.
+		@;cmp r7, #0					@; Mirem si hi han processos a la cua.
+		@;beq .Lfinal					@; Si no hi han processos a la cua, finalitzem la RSI.
 		
 		@; Comprovar si el procés no és del S.O i el seu PID és 0.
 		ldr r4, =_gd_pidz			@; Carreguem adreça de la variable PID i sòcol del procés actual.
@@ -106,7 +110,7 @@ _gp_rsiVBL:
 		bl _gp_restaurarProc		@; Cridem la funció _gp_restaurarProc.
 		
 		
-	.Lfinal:
+	@;.Lfinal:
 	pop {r4-r7, pc}
 
 
@@ -118,6 +122,7 @@ _gp_rsiVBL:
 	@; R6: dirección _gd_pidz
 	@;Resultado
 	@; R5: nuevo número de procesos en READY (+1)
+	.global _gp_salvarProc
 _gp_salvarProc:
 	push {r8-r11, lr}
 		@; Guardar el número de sòcol a la cua de Ready
@@ -190,6 +195,7 @@ _gp_salvarProc:
 	@; R4: dirección _gd_nReady
 	@; R5: número de procesos en READY
 	@; R6: dirección _gd_pidz
+	.global _gp_restaurarProc
 _gp_restaurarProc:
 	push {r8-r11, lr}
 		@; Carregar el número de sòcol del procés a restaurar.
@@ -269,11 +275,9 @@ _gp_restaurarProc:
 		orr r8, r8, #0x12			@; Posem els bits de mode d'execució en mode Normal Interrupt Request (10010b = 12h).
 		msr CPSR, r8				@; Guardem el CPSR amb el nou mode.
 	pop {r8-r11, pc}
-
-
+	
+	
 	.global _gp_numProc
-	
-	
 	@; Retorna el nombre total de processos en el sistema (Procés en Run + Processos en Ready)
 	@; Resultado
 	@; R0: número de procesos total
@@ -393,6 +397,105 @@ _gp_terminarProc:
 .LterminarProc_inf:
 	bl _gp_WaitForVBlank			@; pausar procesador
 	b .LterminarProc_inf			@; hasta asegurar el cambio de contexto
+	
+	
+	.global _ga_send
+	@; Rutina per enviar una dada de tipus int a la bústia indicada per paràmetre.
+	@; Paràmetres d'entrada:
+	@; R0: n (ID bústia, 0-7).
+	@; R1: data (dada de tipus int).
+	@; Resultat:
+	@; R0: 1 si s'ha enviat amb èxit, 0 si hi ha hagut un error (bústia plena o ID invàlid)
+_ga_send:
+	push {r4-r7, lr}
+		@; Validem n (ID de la bústia)
+		cmp r0, #8
+		bhs .Lsend_error				@; Saltem a retornar error si el ID de la bústia >= 8.
+		
+		@; Calculem l'adreça de la bústia per enviar la dada.
+		ldr r4, =_gd_mailboxes			@; Carreguem l'adreça base dels vectors de les bústies.
+		mov r5, #MAILBOX_STRUCT_SIZE	@; Carreguem el tamany de cada posició del vector de bústies.
+		mla r4, r0, r5, r4				@; Calculem l'adreça de la bústia n (n * Tamany de cada posició + Adreça base vectors)
+		
+		@; Llegim el comptador de dades (count) de la bústia per comprovar que no estigui plena.
+		ldr r5, [r4, #72]				@; Carreguem el offset 72 (count) de la bústia.
+		cmp r5, #MAILBOX_QUEUE_SIZE		@; Comparem el comptador amb el nombre màxim de dades.
+		bhs .Lsend_error				@; Si el comptador >= 16, la bústia està plena, per tant tirem error.
+		
+		@; Afegim la dada a la cua.
+		ldr r6, [r4, #68]				@; Carreguem a R6 el índex del final de la cua (tail).
+		add r7, r4, r6, lsl #2			@; Calculem l'adreça del índex tail (Adreça del inici de la bústia + (índex tail * 4).
+		str r1, [r7]					@; Guardem la dada en la posició.
+		
+		@; Actualitzem índex tail (tail++)
+		add r6, r6, #1					@; Incrementem índex tail
+		cmp r6, #MAILBOX_QUEUE_SIZE		@; Mirem si el índex tail és igual a 16.
+		moveq r6, #0					@; Si tail == 16, posem tail = 0 (Round Robin)
+		str r6, [r4, #68]				@; Tornem a guardar el índex tail en el vector de la bústia.
+		
+		@; Incrementem variable comptador de dades
+		add r5, r5, #1					@; Incrementem el comptador.
+		str r5, [r4, #72]				@; Guardem la variable comptador en el vector de la bústia.
+		
+		@; Retornem codi d'èxit per R0
+		mov r0, #1						@; Codi èxit.
+		b .Lsend_end					@; Saltem al final de la funció
+		
+		.Lsend_error:
+			mov r0, #0					@; Codi d'error.
+		
+		.Lsend_end:
+	pop {r4-r7, pc}
+	
+	
+	.global _ga_receive
+	@; Rutina per rebre una dada a través de la bústia indicada per paràmetre.
+	@; Aquesta funció bloqueja el procés que la crida en cas de que la bústia indicada estigui buida.
+	@; Un procés només es desbloquejarà en el moment que la bústia que ha demanat deixi d'estar buida.
+	@; Paràmetres d'entrada:
+	@; R0: n (ID bústia, 0-7)
+	@; Retorna:
+	@; R0: la dada rebuda de la bústia
+_ga_receive:
+	push {r4-r7, lr}
+		@; Calculem l'adreça de la bústia
+		ldr r4, =_gd_mailboxes			@; Carreguem l'adreça base dels vectors de les bústies.
+		mov r5, #MAILBOX_STRUCT_SIZE	@; Carreguem el tamany de cada posició del vector de bústies.
+		mla r4, r0, r5, r4				@; Calculem l'adreça de la bústia n (n * Tamany de cada posició + Adreça base vectors).
+		
+		@; Bucle de consulta del estat de la bústia
+		.Lreceive_loop:
+			@; Comprovar si està buida la bústia
+			ldr r5, [r4, #72]			@; Carreguem la variable comptador de dades (count).
+			cmp r5, #0					@; Mirem si el comptador == 0.
+			beq .Lreceive_wait			@; Saltar al bucle d'espera (per bloquejar) si count == 0 (bústia buida).
+			
+			@; Treiem la dada de la cua
+			ldr r6, [r4, #64]			@; Carreguem la variable del principi de la cua (head).
+			add r7, r4, r6, lsl #2		@; Calculem l'adreça de la posició head (Adreça base de la bústia + (índex head * 4).
+			ldr r0, [r7]				@; Carreguem a R0 la dada per retornar-la.
+			
+			@; Actualitzem índex head (head++)
+			add r6, r6, #1				@; Incrementem índex head.
+			cmp r6, #MAILBOX_QUEUE_SIZE	@; Mirem si el índex head és igual a 16
+			moveq r6, #0				@; Si head == 16, posem head = 0 (Round Robin)
+			str r6, [r4, #64]			@; Guardem el valor actualitzat del head.
+			
+			@; Decrementar count
+			sub r5, r5, #1				@; Fem count--
+			str r5, [r4, #72]			@; Guardar el nou valor del count.
+			
+			b .Lreceive_end				@; Hem rebut la dada, sortir
+			
+		@; La bústia està buida, esperar al següent VBlank (bloquejar el procés).	
+		.Lreceive_wait:
+			bl _gp_WaitForVBlank		@; Cedim CPU i esperar un 'tic'
+			b .Lreceive_loop			@; Tornem a comprovar si la bústia és buida.
+			
+		.Lreceive_end:
+	pop {r4-r7, pc}
+			
+
 	
 .end
 
