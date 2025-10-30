@@ -8,6 +8,8 @@ GARLIC 1.0
 
 #include <garlic_font.h>   // definición gráfica de caracteres
 #include <garlic_system.h> // definición de funciones y variables de sistema
+#include <icons.h>
+#include <Sprites_sopo.h>
 
 /* definiciones para realizar cálculos relativos a la posición de los
 caracteres dentro de las ventanas gráficas, que pueden ser 4 o 16 */
@@ -73,7 +75,8 @@ void _gg_generarMarco(int v) {
 void _gg_iniGrafA() {
 
   // Inicialitzar procesador A mode 5 en pantalla superior
-  videoSetMode(MODE_5_2D | DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
+  // Adicional: Inicialitzar el display de Sprites
+  videoSetMode(MODE_5_2D | DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE | DISPLAY_SPR_1D_LAYOUT | DISPLAY_SPR_ACTIVE);
   vramSetBankA(VRAM_A_MAIN_BG_0x06000000);
   lcdMainOnTop();
 
@@ -88,7 +91,7 @@ void _gg_iniGrafA() {
   bg3 = bgInit(3, BgType_ExRotation, BgSize_ER_512x512, 4, 3);
 
   // Prioritat bg3 > bg2
-  bgSetPriority(bg2, 1);
+  bgSetPriority(bg2, 2);
   bgSetPriority(bg3, 0);
 
   // Descomprimir i copiar lletres/paleta
@@ -104,6 +107,30 @@ void _gg_iniGrafA() {
   bgSetScale(bg2, 512, 512);
   bgSetScale(bg3, 512, 512);
   bgUpdate();
+
+  // Adicionals: Sprites
+  // Assignar el BankE per als Sprites
+  vramSetBankE(VRAM_E_MAIN_SPRITE);
+
+  // Descomprimir i copiar icones/paleta
+  decompress(iconsTiles, SPRITE_GFX, LZ77Vram);
+  dmaCopy(iconsPal, SPRITE_PALETTE, sizeof(iconsPal));
+
+  // Inicialitzar Sprites com a ocults
+  SPR_oculta_sprites(128);
+
+  // Inicialitzar _gd_sprites
+  for (int i = 0; i < 128; i++) {
+      _gd_sprites[i].icon = 0xFF;
+      _gd_sprites[i].n = 0xFF;
+      _gd_sprites[i].px = 0;
+      _gd_sprites[i].py = 0;
+      _gd_sprites[i].visible = 0;
+      _gd_sprites[i].zocalo = 0xFF;
+  }
+
+  // Factor de escalado 50%
+  SPR_fija_escalado(0, 128, 128);
 }
 
 /* _gg_procesarFormato: copia los caracteres del string de formato sobre el string 
@@ -176,13 +203,23 @@ void _gg_procesarFormato(char *formato, unsigned int val1, unsigned int val2,
 					break;
                 case 'x':
 					_gs_num2str_hex(val_tmp, sizeof(val_tmp), val_act);
+					int ignore0 = 1;
                     // Guardar el valor transcrit
-                    for (int k = 0; val_tmp[k] != '\0'; k++) {
-                        if (val_tmp[k] != '0') { // No guardar espais en blanc
-                            resultado[i] = val_tmp[k];
-                            i++;
-                        }
-                    }
+					if (val_act == 0) {
+						resultado[i] = '0';
+						i++;
+					} else {
+						for (int k = 0; val_tmp[k] != '\0'; k++) {
+							// No guardar espais en blanc fins arribar al primer numero != 0
+							if (val_tmp[k] != '0' && ignore0) {
+								ignore0 = 0;
+							}
+							if (!ignore0) {
+								resultado[i] = val_tmp[k];
+								i++;
+							}
+						}
+					}
 					val_cmp++;
 					break;
                 case 's':
@@ -284,3 +321,121 @@ void _gg_escribir(char *formato, unsigned int val1, unsigned int val2,
         i++; // seguent caracter
     }
 }
+
+// Funcio que neteja la pantalla i actualitza el cursor a la primera linia
+void _gg_clearScreen(unsigned char zocalo) {
+	// Fila inicial de la particio
+  int Fp = (zocalo / PPART) * VFILS;
+  // Columna inicial de la particio
+  int Cp = (zocalo % PPART) * VCOLS;
+
+  // Punter a la base del mapa 2 en la finestra v
+  u16 *map_Ptr = (u16 *)bgGetMapPtr(bg2);
+
+  for (int Fv = 0; Fv < VFILS; Fv++) {
+    for (int Fc = 0; Fc < VCOLS; Fc++) {
+      // Posar caracter buit a totes les posicions
+      int offset_rel = (Fp + Fv) * PCOLS + (Cp + Fc);
+      map_Ptr[offset_rel] = 0;
+    }
+  }
+  // Reiniciar cursor adalt de tot
+  _gd_wbfs[zocalo].pControl = 0;
+}
+
+ void _gg_spriteSet(unsigned char n, unsigned char icon, unsigned char zocalo) {
+ 
+    if (n >= MAX_SPRITE_PROC) {
+        return;
+    }
+    // Index global de sprites
+    int idx_global = (zocalo * MAX_SPRITE_PROC) + n;
+
+    // Actualitzar estat del vector de sprites
+    _gd_sprites[idx_global].icon = icon;
+    _gd_sprites[idx_global].zocalo = zocalo;
+    _gd_sprites[idx_global].n = idx_global;
+}
+
+
+void _gg_spriteMove(unsigned char n, short px, short py, unsigned char zocalo) {
+
+    if (n >= MAX_SPRITE_PROC) {
+        return;
+    }
+
+    // Index global de sprites
+    int idx_global = (zocalo * MAX_SPRITE_PROC) + n;
+	
+	// Delimitar
+	if (px < -32)
+		px = -32;
+	else if (px > 256)
+		px = 256;
+	else if (py < -32)
+		py = -32;
+	else if (py > 192)
+		py = 192;
+
+    // Actualitzar vector de sprites
+    _gd_sprites[idx_global].px = px;
+    _gd_sprites[idx_global].py = py;
+}
+
+void _gg_spriteShow(unsigned char n, unsigned char zocalo) {
+
+    if (n >= MAX_SPRITE_PROC) {
+        return;
+    }
+
+    // Index global de sprites
+    int idx_global = (zocalo * MAX_SPRITE_PROC) + n;
+	
+    //Actualitzar vector de sprites
+    _gd_sprites[idx_global].visible = 1;
+}
+
+
+void _gg_spriteHide(unsigned char n, unsigned char zocalo) {
+
+    if (n >= MAX_SPRITE_PROC) {
+      return;
+    }
+
+    // Index global de sprites
+    int idx_global = (zocalo * MAX_SPRITE_PROC) + n;
+    //Actualitzar vector de sprites
+	_gd_sprites[idx_global].visible = 0;
+}
+
+
+void _gg_actualiza_sprites() {
+
+    for (int idx_global = 0; idx_global < 128; idx_global++) {
+	
+        garlicSPRITE *s = &_gd_sprites[idx_global];
+		
+        // Sprite inicialitzat
+        if (s->icon != 0xFF) {
+		
+            // Posicio relativa de la finestra
+            short base_x = (s->zocalo % PPART) * 128;
+            short base_y = (s->zocalo / PPART) * 96;
+			
+            // Posicio absoluta de la pantalla
+            short abs_px = base_x + s->px;
+            short abs_py = base_y + s->py;
+			
+            SPR_crea_sprite(idx_global, 0, 2, s->icon * 16);
+            SPR_fija_prioridad(idx_global, 1);
+            SPR_mueve_sprite(idx_global, abs_px, abs_py);
+			
+            if (s->visible) {
+                SPR_muestra_sprite(idx_global);
+            } else {
+                SPR_oculta_sprite(idx_global);
+            }
+        }
+    }            
+    SPR_actualiza_sprites(OAM, 128);
+} 

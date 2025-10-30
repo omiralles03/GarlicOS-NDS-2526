@@ -161,7 +161,7 @@ _ga_spriteMove:
 	.global _ga_spriteShow
 	@;Parámetros
 	@; R0: unsigned char n
-_ga_spriteMove:
+_ga_spriteShow:
 	push {r4, lr}
 	ldr r4, =_gd_pidz		@; R4 = dirección _gd_pidz
 	ldr r1, [r4]
@@ -181,5 +181,15 @@ _ga_spriteHide:
 	bl _gg_spriteHide
 	pop {r4, pc}
 
+	.global _ga_clearScreen
+	@;Parámetros
+_ga_clearScreen:
+	push {r4, lr}
+	ldr r4, =_gd_pidz		@; R4 = dirección _gd_pidz
+	ldr r0, [r4]
+	and r0, #0x3			@; R1 = ventana de salida (zócalo actual MOD 4)
+	bl _gg_clearScreen
+	pop {r4, pc}
+	
 .end
 

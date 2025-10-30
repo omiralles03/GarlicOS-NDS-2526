@@ -82,6 +82,7 @@ typedef struct
 
 extern garlicSPRITE _gd_sprites[16*8]; // vector amb els 128 (16 * 8) PCBs de sprites
 
+#define MAX_SPRITE_PROC 8 // Maxim de sprites per proces
 
 //------------------------------------------------------------------------------
 //	Rutinas de gestión de procesos (garlic_itcm_proc.s)
@@ -189,10 +190,12 @@ extern void _gg_escribir(char *formato, unsigned int val1, unsigned int val2,
 																   int ventana);
 
 
-extern void _gg_spriteSet(unsigned char n, unsigned char icon);
-extern void _gg_spriteMove(unsigned char n, short px, short py);
-extern void _gg_spriteShow(unsigned char n);
-extern void _gg_spriteHide(unsigned char n);
+extern void _gg_spriteSet(unsigned char n, unsigned char icon, unsigned char zocalo);
+extern void _gg_spriteMove(unsigned char n, short px, short py, unsigned char zocalo);
+extern void _gg_spriteShow(unsigned char n, unsigned char zocalo);
+extern void _gg_spriteHide(unsigned char n, unsigned char zocalo);
+extern void _gg_actualiza_sprites();
+extern void _gg_clearScreen(unsigned char zocalo);
 //------------------------------------------------------------------------------
 //	Rutinas de soporte a la gestión de gráficos (garlic_itcm_graf.s)
 //------------------------------------------------------------------------------

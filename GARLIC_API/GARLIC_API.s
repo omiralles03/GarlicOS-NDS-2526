@@ -82,4 +82,12 @@ GARLIC_spriteHide:
     ldr pc, [r4, #32]       @; llamada indirecta a rutina 0x08 (_ga_spriteHide)
     pop {r4, pc}
 
+    .global GARLIC_clearScreen
+GARLIC_clearScreen:
+    push {r4, lr}
+    mov r4, #0
+    mov lr, pc
+    ldr pc, [r4, #36]       @; llamada indirecta a rutina 0x09 (_ga_clearScreen)
+    pop {r4, pc}
+
 .end

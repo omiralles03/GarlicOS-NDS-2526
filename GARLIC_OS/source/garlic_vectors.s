@@ -17,5 +17,6 @@ APIVector:						@; Vector de direcciones de rutinas del API
     .word   _ga_spriteMove
     .word   _ga_spriteShow
     .word   _ga_spriteHide
+	.word   _ga_clearScreen
 
 .end

@@ -57,6 +57,6 @@ extern void GARLIC_spriteSet(unsigned char n, unsigned char icon);
 extern void GARLIC_spriteMove(unsigned char n, short px, short py);
 extern void GARLIC_spriteShow(unsigned char n);
 extern void GARLIC_spriteHide(unsigned char n);
-
+extern void GARLIC_clearScreen();
 
 #endif // _GARLIC_API_h_
