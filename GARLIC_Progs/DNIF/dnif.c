@@ -20,13 +20,13 @@ unsigned int random_inRange(unsigned int range, unsigned int min)
 
 /* Proceso dnif, con llamadas a las funciones del API del sistema Garlic */
 //------------------------------------------------------------------------------
-int _start(int tipoDNI)
+int dnif(int tipoDNI)
 //------------------------------------------------------------------------------
 {
 	GARLIC_printf("-- Programa DNIF  -  PID (%d) --\n", GARLIC_pid());
-
+	
 	// tipoDNI = 0 -> DNI, tipoDNI = 1 -> NIE
-	if(tipoDNI != 0 || tipoDNI != 1)
+	if(tipoDNI > 1 || tipoDNI < 0)
 	{
 		tipoDNI = 0;		// Asumir tipo como DNI si el argumento es incorrecto
 	}
@@ -37,10 +37,12 @@ int _start(int tipoDNI)
 	unsigned int quo;		// quociente para GARLIC_divmod
 	char* letras = "TRWAGMYFPDXBNJZSQVHLCKE";
 		// Letras que pueden ser asignadas al DNI
+		
+	short digitoNIE;
 	
-	if (tipoDNI) // NIF
+	if (tipoDNI) // NIE
 	{		
-		unsigned int digitoNIE = random_inRange(3, 0); 			// Obtener num. aleatorio de 1 cifra
+		digitoNIE = random_inRange(3, 0); 			// Obtener num. aleatorio de 1 cifra
 		unsigned int numNIE = random_inRange(9000000, 1000000); // Obtener num. aleatorio de 7 cifras
 		numDNI = digitoNIE * 10000000 + numNIE; 		// Obtener numDNI (concatenar digitoNIE con numNIE)
 	}
@@ -51,8 +53,20 @@ int _start(int tipoDNI)
 	
 	GARLIC_divmod(numDNI, 23, &quo, &residuo);	// Obtener el residuo del DNI para saber su letra
 	letraDNI = letras[residuo];					// Obtener letra del DNI
-	for (int i = 0; i < 30; i++)		// escribir mensajes
-		GARLIC_printf("DNI: %d-%c\n", numDNI, letraDNI);
-
+	
+	if (tipoDNI) // NIE
+	{
+		short letraInicial; 
+		if(digitoNIE == 0) letraInicial = 'X';
+		if(digitoNIE == 1) letraInicial = 'Y';
+		else letraInicial = 'Z';
+		
+		GARLIC_printf("\nNIE: %c-%d", letraInicial, numDNI);
+		GARLIC_printf("%c\n\n", letraDNI);
+	}
+	else	// DNI
+	{
+		GARLIC_printf("\nDNI: %d-%c\n\n", numDNI, letraDNI);
+	}
 	return (int)letraDNI;
 }
