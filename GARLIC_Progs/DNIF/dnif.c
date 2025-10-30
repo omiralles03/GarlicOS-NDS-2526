@@ -20,7 +20,7 @@ unsigned int random_inRange(unsigned int range, unsigned int min)
 
 /* Proceso dnif, con llamadas a las funciones del API del sistema Garlic */
 //------------------------------------------------------------------------------
-int dnif(int tipoDNI)
+int _start(int tipoDNI)
 //------------------------------------------------------------------------------
 {
 	GARLIC_printf("-- Programa DNIF  -  PID (%d) --\n", GARLIC_pid());

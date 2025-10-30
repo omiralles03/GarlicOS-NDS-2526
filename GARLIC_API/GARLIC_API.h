@@ -53,20 +53,30 @@ extern int GARLIC_divmodL(long long * num, unsigned int * den,
 		(salto de línia). */
 extern void GARLIC_printf(char * format, ...);
 
+/*------------------------------------------------------------------------------
+	ADICIONALES ProgG
+------------------------------------------------------------------------------*/
 extern void GARLIC_spriteSet(unsigned char n, unsigned char icon);
 extern void GARLIC_spriteMove(unsigned char n, short px, short py);
 extern void GARLIC_spriteShow(unsigned char n);
 extern void GARLIC_spriteHide(unsigned char n);
 extern void GARLIC_clearScreen();
 
+/*------------------------------------------------------------------------------
+	ADICIONALES ProgP
+------------------------------------------------------------------------------*/
 	/* GARLIC_send: envia una dada numèrica 'data' a la bústia amb índex 'n' */
 extern int GARLIC_send(unsigned char n, int data);
-
 
 	/* GARLIC_receive: rep una dada numèrica de la bústia amb índex 'n'.
 		Bloqueja al procés que l'ha cridat en cas que la bústia demanada
 		estigui buida en el moment de la crida. */
 extern int GARLIC_receive(unsigned char n);
 
+/*------------------------------------------------------------------------------
+	ADICIONALES ProgM
+------------------------------------------------------------------------------*/
+extern void * GARLIC_malloc(unsigned short size);
+int GARLIC_free(void * addr);
 
 #endif // _GARLIC_API_h_

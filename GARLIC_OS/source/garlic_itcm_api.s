@@ -128,9 +128,7 @@ _ga_printf:
 	ldr r3, [r4]
 	and r3, #0x3			@; R3 = ventana de salida (zócalo actual MOD 4)
 	bl _gp_WaitForVBlank
-	push {r12}
-	bl printf				@; llamada de prueba
-	pop {r12}
+	bl _gg_escribir
 	pop {r4, pc}
 
 
@@ -184,6 +182,7 @@ _ga_spriteHide:
 	bl _gg_spriteHide
 	pop {r4, pc}
 
+
 	.global _ga_clearScreen
 	@;Parámetros
 _ga_clearScreen:
@@ -193,6 +192,35 @@ _ga_clearScreen:
 	and r0, #0x3			@; R1 = ventana de salida (zócalo actual MOD 4)
 	bl _gg_clearScreen
 	pop {r4, pc}
+	
+
+	.global _ga_malloc
+	@;Paràmetres:
+	@; R0: unsigned int size (bytes a reservar)
+	@;Retorna:
+	@; R0: punter a la memòria reservada || error: 0
+_ga_malloc:
+	push {r1, r4, lr}
+	ldr r4, =_gd_pidz       @;r4 -> adreça de _gd_pidz
+    ldr r1, [r4]            @;r1 = valor _gd_pidz (PID + zócalo)
+    and r1, r1, #0xF        @;r1 = zócalo (4 LSB)
+    @; r0 ja conté 'size'
+    bl _gm_do_malloc        @;_gm_do_malloc(r0=size, r1=zocalo)
+	pop {r1, r4, pc}
+	
+	.global _ga_free
+	@;Paràmetres:
+	@; R0: void *ptr (punter al bloc a alliberar)
+	@;Retorna:
+	@; R0: 1 (si èxit), 0 (si error)
+_ga_free:
+	push {r1, r4, lr}
+	ldr r4, =_gd_pidz       @;r4 -> adreça de _gd_pidz
+    ldr r1, [r4]            @;r1 = valor _gd_pidz (PID + zócalo)
+    and r1, r1, #0xF        @;r1 = zócalo
+    @;r0 = 'ptr'
+    bl _gm_do_free          @;_gm_do_free(r0=ptr, r1=zocalo)
+	pop {r1, r4, pc}
 	
 .end
 

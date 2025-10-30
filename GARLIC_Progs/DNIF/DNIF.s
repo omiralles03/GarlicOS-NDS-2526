@@ -54,12 +54,12 @@ random_inRange:
 	.ascii	"\012DNI: %d-%c\012\012\000"
 	.text
 	.align	2
-	.global	dnif
+	.global	_start
 	.syntax unified
 	.arm
 	.fpu softvfp
-	.type	dnif, %function
-dnif:
+	.type	_start, %function
+_start:
 	@ args = 0, pretend = 0, frame = 40
 	@ frame_needed = 0, uses_anonymous_args = 0
 	str	lr, [sp, #-4]!
@@ -171,5 +171,5 @@ dnif:
 	.word	.LC2
 	.word	.LC3
 	.word	.LC4
-	.size	dnif, .-dnif
+	.size	_start, .-_start
 	.ident	"GCC: (devkitARM release 46) 6.3.0"

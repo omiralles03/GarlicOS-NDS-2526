@@ -9,6 +9,9 @@
 	.arm
 	.align 2
 
+@;==============================================================================
+@;	GARLIC
+@;==============================================================================
 	.global GARLIC_pid
 GARLIC_pid:
 	push {r4, lr}
@@ -49,7 +52,9 @@ GARLIC_printf:
 	ldr pc, [r4, #16]		@; llamada indirecta a rutina 0x04
 	pop {r4, pc}		
 
-@; Llamadas progG
+@;==============================================================================
+@;	ProgG
+@;==============================================================================
     .global GARLIC_spriteSet
 GARLIC_spriteSet:
     push {r4, lr}
@@ -90,20 +95,42 @@ GARLIC_clearScreen:
     ldr pc, [r4, #36]       @; llamada indirecta a rutina 0x09 (_ga_clearScreen)
     pop {r4, pc}
 
-@; Llamadas ProgP
+@;==============================================================================
+@;	ProgP
+@;==============================================================================
 	.global GARLIC_send
 GARLIC_send:
 	push {r4, lr}
-		mov r4, #0
-		mov lr, pc
-		ldr pc, [r4, #40]	@; Cridem indirectament a la rutina 0xA de la API
+	mov r4, #0
+	mov lr, pc
+	ldr pc, [r4, #40]		@; Cridem indirectament a la rutina 0xA de la API
 	pop {r4, pc}
 	
 	.global GARLIC_receive
 GARLIC_receive:
 	push {r4, lr}
-		mov r4, #0
-		mov lr, pc
-		ldr pc, [r4, #44]	@; Cridem indirectament a la rutina 0xB de la API
+	mov r4, #0
+	mov lr, pc
+	ldr pc, [r4, #44]		@; Cridem indirectament a la rutina 0xB de la API
 	pop {r4, pc}
+
+@;==============================================================================
+@;	ProgM
+@;==============================================================================
+	.global GARLIC_malloc
+GARLIC_malloc:
+	push {r4, lr}
+	mov r4, #0
+	mov lr, pc
+	ldr pc, [r4, #48]		@; llamada indirecta a rutina 0xC
+	pop {r4, pc}
+
+	.global GARLIC_free
+GARLIC_free:
+	push {r4, lr}
+	mov r4, #0
+	mov lr, pc
+	ldr pc, [r4, #52] 		@; llamada indirecta a rutina 0xD
+	pop {r4, pc}
+	
 .end
