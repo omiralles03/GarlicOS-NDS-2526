@@ -18,5 +18,7 @@ APIVector:						@; Vector de direcciones de rutinas del API
     .word   _ga_spriteShow
     .word   _ga_spriteHide
 	.word   _ga_clearScreen
+	.word 	_ga_send			@; Nova entrada per GARLIC_send
+	.word	_ga_receive			@; Nova entrada per GARLIC_receive
 
 .end

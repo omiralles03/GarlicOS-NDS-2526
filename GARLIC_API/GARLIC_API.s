@@ -47,7 +47,7 @@ GARLIC_printf:
 	mov r4, #0
 	mov lr, pc
 	ldr pc, [r4, #16]		@; llamada indirecta a rutina 0x04
-	pop {r4, pc}
+	pop {r4, pc}		
 
 @; Llamadas progG
     .global GARLIC_spriteSet
@@ -90,4 +90,20 @@ GARLIC_clearScreen:
     ldr pc, [r4, #36]       @; llamada indirecta a rutina 0x09 (_ga_clearScreen)
     pop {r4, pc}
 
+@; Llamadas ProgP
+	.global GARLIC_send
+GARLIC_send:
+	push {r4, lr}
+		mov r4, #0
+		mov lr, pc
+		ldr pc, [r4, #40]	@; Cridem indirectament a la rutina 0xA de la API
+	pop {r4, pc}
+	
+	.global GARLIC_receive
+GARLIC_receive:
+	push {r4, lr}
+		mov r4, #0
+		mov lr, pc
+		ldr pc, [r4, #44]	@; Cridem indirectament a la rutina 0xB de la API
+	pop {r4, pc}
 .end
