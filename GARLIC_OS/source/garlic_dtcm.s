@@ -36,5 +36,8 @@ _gd_wbfs:	.space 4 * (4 + 32)
 	.global _gd_stacks			@; Vector de pilas de los procesos activos
 _gd_stacks:	.space 15 * 128 * 4
 
+    .global _gd_sprites
+_gd_sprites: .space 128 * 8     @; Vector de sprites
+
 .end
 
