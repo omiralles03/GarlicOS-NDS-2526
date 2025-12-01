@@ -4,10 +4,11 @@
 						rutinas del sistema operativo GARLIC (versión 1.0)
 
 	Analista-programador: santiago.romani@urv.cat
-	Programador P: xxx.xxx@estudiants.urv.cat
+
+	Programador P: anthonyjohn.cardenas@estudiants.urv.cat
 	Programador M: arnau.faura@estudiants.urv.cat
-	Programador G: zzz.zzz@estudiants.urv.cat
-	Programador T: uuu.uuu@estudiants.urv.cat
+	Programador G: oupman.miralles@estudiants.urv.cat
+	Programador T: nobody@estudiants.urv.cat
 
 ------------------------------------------------------------------------------*/
 #ifndef _GARLIC_SYSTEM_h
@@ -68,8 +69,21 @@ extern garlicWBUF _gd_wbfs[4];	// vector con los buffers de 4 ventanas
 
 extern int _gd_stacks[15*128];	// vector con las pilas de los procesos activos
 
+// Variables globals progG tareas adicionals
+typedef struct
+{
+    unsigned char icon;     // Icona (0-63)
+    unsigned char zocalo;   // Zocalo (0-15)
+    unsigned char n;        // Numero sprite (0-7)
+    unsigned char visible;  // Estat (0: ocult, 1: visible)
+    short px;               // Posicio X relativa (-32 a 256)
+    short py;               // Posicio Y relativa (-32 a 192)
 
+} PACKED garlicSPRITE;
 
+extern garlicSPRITE _gd_sprites[16*8]; // vector amb els 128 (16 * 8) PCBs de sprites
+
+#define MAX_SPRITE_PROC 8 // Maxim de sprites per proces
 
 //------------------------------------------------------------------------------
 //	Rutinas de gestión de procesos (garlic_itcm_proc.s)
@@ -183,6 +197,12 @@ extern void _gg_escribir(char *formato, unsigned int val1, unsigned int val2,
 																   int ventana);
 
 
+extern void _gg_spriteSet(unsigned char n, unsigned char icon, unsigned char zocalo);
+extern void _gg_spriteMove(unsigned char n, short px, short py, unsigned char zocalo);
+extern void _gg_spriteShow(unsigned char n, unsigned char zocalo);
+extern void _gg_spriteHide(unsigned char n, unsigned char zocalo);
+extern void _gg_actualiza_sprites();
+extern void _gg_clearScreen(unsigned char zocalo);
 //------------------------------------------------------------------------------
 //	Rutinas de soporte a la gestión de gráficos (garlic_itcm_graf.s)
 //------------------------------------------------------------------------------
@@ -240,6 +260,25 @@ extern int _gs_num2str_hex(char * numstr, unsigned int length, unsigned int num)
 				memoria deben estar alineadas a word */
 extern void _gs_copiaMem(const void *source, void *dest, unsigned int numBytes);
 
+
+
+//------------------------------------------------------------------------------
+//	FUNCIONALITATS ADDICIONALS: Bústies (Mailboxes)
+//------------------------------------------------------------------------------
+
+#define MAILBOX_QUEUE_SIZE 16 // Mida de la cua de cada bústia
+
+// Estructura d'una bústia (Mailbox)
+typedef struct
+{
+	int queue[MAILBOX_QUEUE_SIZE];	// Cua de dades 
+	int head;						// Índex principi cua
+	int tail;						// Índex final cua
+	int count;						// Nombre de dades a la cua
+} PACKED garlicMailbox;
+
+// Vector global per a les 8 bústies
+extern garlicMailbox _gd_mailboxes[8];
 
 
 #endif // _GARLIC_SYSTEM_h

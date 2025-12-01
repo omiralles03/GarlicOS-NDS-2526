@@ -1,6 +1,6 @@
 @;==============================================================================
 @;
-@;	"garlic_itcm_api.s":	código de las rutinas del API de GARLIC 1.0
+@;	"garlic_itcm_api.s":	código de las rutinas del API de GARLIC 2.0
 @;							(ver "GARLIC_API.h" para descripción de las
 @;							 funciones correspondientes)
 @;
@@ -126,12 +126,136 @@ _ga_printf:
 	push {r4, lr}
 	ldr r4, =_gd_pidz		@; R4 = dirección _gd_pidz
 	ldr r3, [r4]
-	and r3, #0x3			@; R3 = ventana de salida (zócalo actual MOD 4)
-	push {r12}
-	bl printf				@; llamada de prueba
-	pop {r12}
+	and r3, #0xf			@; R3 = ventana de salida (zócalo actual MOD 16)
+	bl _gg_escribir
 	pop {r4, pc}
 
+	.global _ga_printchar
+	@;Parámetros
+	@; R0: int vx
+	@; R1: int vy
+	@; R2: char c
+	@; R3: int color
+_ga_printchar:
+	push {r4-r8, lr}
+	mov r6, r0
+	mov r7, r1
+	mov r8, r2
+	ldr r5, =_gd_pidz		@; R5 = direcci?n _gd_pidz
+	ldr r4, [r5]
+	and r4, #0xf			@; R4 = ventana de salida (z?calo actual)
+	push {r4}				@; pasar 4? par?metro (n?m. ventana) por la pila
+	bl _gg_escribirCar
+	add sp, #4				@; eliminar 4? par?metro de la pila
+	pop {r4-r8, pc}
+
+	.align 2
+	.global _ga_printmat
+	@;Parámetros
+	@; R0: int vx
+	@; R1: int vy
+	@; R2: char *m[]
+	@; R3: int color
+_ga_printmat:
+	push {r4-r5, lr}
+	ldr r5, =_gd_pidz		@; R5 = direcci?n _gd_pidz
+	ldr r4, [r5]
+	and r4, #0xf			@; R4 = ventana de salida (z?calo actual)
+	push {r4}				@; pasar 4? par?metro (n?m. ventana) por la pila
+	bl _gg_escribirMat
+	add sp, #4				@; eliminar 4? par?metro de la pila
+	pop {r4-r5, pc}
+
+	.global _ga_delay
+	@;Parámetros
+	@; R0: int nsec
+_ga_delay:
+	push {r2-r3, lr}
+	ldr r3, =_gd_pidz		@; R3 = direcci?n _gd_pidz
+	ldr r2, [r3]
+	and r2, #0xf			@; R2 = z?calo actual
+	cmp r0, #0
+	bhi .Ldelay1
+	bl _gp_WaitForVBlank	@; si nsec = 0, solo desbanca el proceso
+	b .Ldelay2				@; y salta al final de la rutina
+.Ldelay1:
+	cmp r0, #600
+	movhi r0, #600			@; limitar el n?mero de segundos a 600 (10 minutos)
+	bl _gp_retardarProc
+.Ldelay2:
+	pop {r2-r3, pc}
+
+	.global _ga_clear
+_ga_clear:
+	push {r0-r1, lr}
+	ldr r1, =_gd_pidz
+	ldr r0, [r1]
+	and r0, #0xf			@; R0 = z?calo actual
+	mov r1, #1				@; R1 = 1 -> 16 ventanas
+	bl _gs_borrarVentana
+	pop {r0-r1, pc}
+	
+	.global _ga_spriteSet
+	@;Parámetros
+	@; R0: unsigned char n,
+	@; R1: unsigned char icon
+_ga_spriteSet:
+	push {r4, lr}
+	ldr r4, =_gd_pidz		@; R4 = dirección _gd_pidz
+	ldr r2, [r4]
+	and r2, #0x3			@; R2 = ventana de salida (zócalo actual MOD 4)
+	bl _gg_spriteSet
+	pop {r4, pc}
+
+
+	.global _ga_spriteMove
+	@;Parámetros
+	@; R0: unsigned char n,
+	@; R1: short px,
+    @; R2: short py
+_ga_spriteMove:
+	push {r4, lr}
+	ldr r4, =_gd_pidz		@; R4 = dirección _gd_pidz
+	ldr r3, [r4]
+	and r3, #0x3			@; R3 = ventana de salida (zócalo actual MOD 4)
+	bl _gg_spriteMove
+	pop {r4, pc}
+
+
+	.global _ga_spriteShow
+	@;Parámetros
+	@; R0: unsigned char n
+_ga_spriteShow:
+	push {r4, lr}
+	ldr r4, =_gd_pidz		@; R4 = dirección _gd_pidz
+	ldr r1, [r4]
+	and r1, #0x3			@; R1 = ventana de salida (zócalo actual MOD 4)
+	bl _gg_spriteShow
+	pop {r4, pc}
+
+
+	.global _ga_spriteHide
+	@;Parámetros
+	@; R0: unsigned char n
+_ga_spriteHide:
+	push {r4, lr}
+	ldr r4, =_gd_pidz		@; R4 = dirección _gd_pidz
+	ldr r1, [r4]
+	and r1, #0x3			@; R1 = ventana de salida (zócalo actual MOD 4)
+	bl _gg_spriteHide
+	pop {r4, pc}
+
+
+	.global _ga_clearScreen
+	@;Parámetros
+_ga_clearScreen:
+	push {r4, lr}
+	ldr r4, =_gd_pidz		@; R4 = dirección _gd_pidz
+	ldr r0, [r4]
+	and r0, #0x3			@; R1 = ventana de salida (zócalo actual MOD 4)
+	bl _gg_clearScreen
+	pop {r4, pc}
+	
 
 	.global _ga_malloc
 	@;Paràmetres:
