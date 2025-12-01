@@ -7,6 +7,7 @@
 ------------------------------------------------------------------------------*/
 #include <nds.h>
 #include <filesystem.h>
+#include <dirent.h>			// para struct dirent, etc.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,6 +20,8 @@
 #define EI_NIDENT 16
 #define PT_LOAD 1	//tipus de segment -> CARREGABLE a memòria
 						//(ELF) = 1 (entero).
+
+unsigned int ini_prog = INI_MEM;	// dirección inicial para nuevo programa (afegit en fase 2)
 
 unsigned int dMem_lliure = INI_MEM;	//pos. mem. lliure dinàmicament ( suposem total segments < 24KB)
 										//inicialment valor carrega primer seg.
@@ -72,93 +75,36 @@ int _gm_initFS()
 	return nitroFSInit(NULL); 	//ini. sis. fit. NITRO
 }
 
+/* _gm_listaProgs: devuelve una lista con los nombres en clave de todos
+			los programas que se encuentran en el directorio "Programas".
+			 Se considera que un fichero es un programa si su nombre tiene
+			8 caracteres y termina con ".elf"; se devuelven s?lo los
+			4 primeros caracteres de los programas (nombre en clave).
+			 El resultado es un vector de strings (paso por referencia) y
+			el n?mero de programas detectados */
+int _gm_listaProgs(char* progs[])
+{
 
+}
 
 /* _gm_cargarPrograma: busca un fichero de nombre "(keyName).elf" dentro del
-					directorio "/Programas/" del sistema de ficheros, y
-					carga los segmentos de programa a partir de una posición de
-					memoria libre, efectuando la reubicación de las referencias
-					a los símbolos del programa, según el desplazamiento del
-					código en la memoria destino;
-	Parámetros:
-		keyName ->	vector de 4 caracteres con el nombre en clave del programa
+					directorio "/Programas/" del sistema de ficheros y carga
+					los segmentos de programa a partir de una posici?n de
+					memoria libre, efectuando la reubicaci?n de las referencias
+					a los s?mbolos del programa seg?n el desplazamiento del
+					c?digo y los datos en la memoria destino;
+	Par?metros:
+		zocalo	->	?ndice del z?calo que indexar? el proceso del programa
+		keyName ->	string de 4 car?cteres con el nombre en clave del programa
 	Resultado:
-		!= 0	->	dirección de inicio del programa (intFunc)
+		!= 0	->	direcci?n de inicio del programa (intFunc)
 		== 0	->	no se ha podido cargar el programa
 */
-intFunc _gm_cargarPrograma(char *keyName)
+intFunc _gm_cargarPrograma(int zocalo, char *keyName)
 {
-	//cargar la ruta del .elf del programa
-	char ruta[32];
-	sprintf(ruta, "/Programas/%s.elf", keyName);
-	
-	FILE *fit = fopen(ruta, "rb");
-	if (fit == NULL){
-		printf("ERROR: intent obrir fitxer %s \n", ruta);
-		return (intFunc)0;
-	} 	
-	//printf("S'ha obert el fitxer \n");
 
-	fseek(fit, 0, SEEK_END);
-	long fsize = ftell(fit); //fsize = mida .elf del programa
-	fseek(fit, 0, SEEK_SET);
-	
-	//TODO: crear el propi malloc
-	//carga fitxer a memoria 
-	char *fitBuffer = (char *)malloc(fsize);  
-	if (fitBuffer == NULL){
-		printf("ERROR: reserva espai buffer fitxer \n");
-		fclose(fit);
-		return (intFunc)0;
-	}
-	//printf("S'ha reservat mem. pel fitxer \n");
-	
-	size_t freadsize = fread(fitBuffer, 1, fsize, fit);
-	if (freadsize != fsize){
-		printf("ERROR: copia contingut fitxer to buffer \n");
-		fclose(fit);
-		//TODO: crear propi free
-		free(fitBuffer);
-		return (intFunc)0;
-	}
-	fclose(fit);
-	//printf("S'ha copiat el contingut del fitxer a memoria amb mida %u bytes\n", freadsize);
-	
-	unsigned int dMem_lliure_inicial = dMem_lliure;
-	
-	Elf32_Ehdr *elfHeader = (Elf32_Ehdr *)fitBuffer;
-	Elf32_Phdr *progHeader = (Elf32_Phdr *)(fitBuffer + elfHeader->e_phoff);
-	
-	unsigned int offset = dMem_lliure_inicial - progHeader[0].p_paddr;	
-	unsigned int *entryPoint = (unsigned int *)(elfHeader->e_entry + offset);
-	
-	for(int i = 0; i < elfHeader->e_phnum; i++){
-		if (progHeader[i].p_type != PT_LOAD) continue;
-		
-		//direccio inicial programa
-		unsigned int *memDest = (unsigned int *)(offset + progHeader[i].p_paddr);
-		//printf("El seg. %d es carrega a %p \n", i, memDest);
-		//printf("El start() estara a %p \n", entryPoint);
-		
-		_gs_copiaMem(fitBuffer + progHeader[i].p_offset, memDest, progHeader[i].p_filesz);
-		
-		//si (p_memsz > p_filesz), existeix part segment en memoria que no 
-			//esta en el arxiu (cas zones .bss), posar-la a valor 0.
-		if (progHeader[i].p_memsz > progHeader[i].p_filesz){
-			void *bss_start = (char *)memDest + progHeader[i].p_filesz;
-            unsigned int bss_size = progHeader[i].p_memsz - progHeader[i].p_filesz;
-            memset(bss_start, 0, bss_size);
-		}
-		//reubicacions de memoria
-		dMem_lliure += progHeader[i].p_memsz;
-		dMem_lliure = (dMem_lliure + 3) & ~3;	//round-up a adreça divisible per 4 
-	}
-	_gm_reubicar(fitBuffer, progHeader[0].p_paddr, (unsigned int *)dMem_lliure_inicial);
-	free(fitBuffer);
-	
-	return (intFunc)entryPoint;
-	//return ((intFunc) INI_MEM);
 }
+
 
 void *_gm_do_malloc(unsigned int size, int zocalo) {
     if (zocalo < 0 || zocalo > 15 || num_blocs_reservats[zocalo] >= 4) {
