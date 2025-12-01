@@ -1,6 +1,6 @@
 /*------------------------------------------------------------------------------
 
-	"PRTF.c" : programa de test de la función de API GARLIC_printf();
+	"PRNT.c" : programa de test de la función de API GARLIC_printf();
 				(versión 1.0)
 	
 	Imprime diversos mensajes por ventana, comprobando el funcionamiento de
@@ -47,7 +47,7 @@ int _start(int arg)				/* función de inicio : no se usa 'main' */
 	else if (arg > 3) arg = 3;		// valor mínimo del argumento
 	
 									// esccribir mensaje inicial
-	GARLIC_printf("-- Programa PRTF  -  PID (%d) --\n", GARLIC_pid());
+	GARLIC_printf("-- Programa PRNT  -  PID (%d) --\n", GARLIC_pid());
 	
 	GARLIC_printf("\nPrueba juego de caracteres:\n");
 	for (i = 32; i < 128; i++)		// imprimir todo el repertorio de códigos
