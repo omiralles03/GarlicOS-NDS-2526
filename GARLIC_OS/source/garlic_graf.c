@@ -13,8 +13,8 @@ GARLIC 1.0
 
 /* definiciones para realizar cálculos relativos a la posición de los
 caracteres dentro de las ventanas gráficas, que pueden ser 4 o 16 */
-#define NVENT 4 // número de ventanas totales
-#define PPART 2 // número de ventanas horizontales (particiones de pantalla)
+#define NVENT 16 // número de ventanas totales
+#define PPART 4 // número de ventanas horizontales (particiones de pantalla)
 
 #define VCOLS 32 // columnas y filas de cualquier ventana
 #define VFILS 24
@@ -22,9 +22,10 @@ caracteres dentro de las ventanas gráficas, que pueden ser 4 o 16 */
 #define PFILS VFILS *PPART // número de filas totales
 
 int bg2, bg3;
+const unsigned int char_colors[] = {240, 96, 64};	// amarillo, verde, rojo
 
 /* _gg_generarMarco: dibuja el marco de la ventana que se indica por parámetro*/
-void _gg_generarMarco(int v) {
+void _gg_generarMarco(int v, int color) {
 
   // Fila inicial de la particio
   int Fp = (v / PPART) * VFILS;
@@ -257,7 +258,8 @@ void _gg_procesarFormato(char *formato, unsigned int val1, unsigned int val2,
                             admite '\n' (salto de línea), '\t' (tabulador, 4 espacios) 
                             y códigos entre 32 y 159 (los 32 últimos son caracteres gráficos), 
                             además de códigos de formato %c, %d, %x y %s (max. 2 códigos por cadena)
-
+							y de las marcas de cambio de color actual 
+							%0 (blanco), %1 (amarillo), %2 (verde) y %3 (rojo)
                 val1	->	valor a sustituir en primer código de formato, si existe 
 
                 val2	->	valor a sustituir en segundo código de formato, si existe
