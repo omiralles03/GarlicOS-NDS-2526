@@ -73,7 +73,7 @@ typedef struct				// Estructura del buffer de una ventana
 	int pControl;			//	control de escritura en ventana
 							//		16 bits altos: número de línea (0-23)
 							//		16 bits bajos: caracteres pendientes (0-32)
-	char pChars[32];		//	vector de 32 caracteres pendientes de escritura
+	short pChars[32];		//	vector de 32 caracteres pendientes de escritura
 							//		indicando el código ASCII de cada posición
 } PACKED garlicWBUF;
 
