@@ -1,54 +1,95 @@
 /*------------------------------------------------------------------------------
 
-	"main.c" : fase 1 / programador G
+	"main.c" : fase 1 + programador G
+	"main.c" : fase 1 + programador P
+	"main.c" : fase 1 / programador M
 
-	Programa de prueba de llamada de funciones gráficas de GARLIC 1.0,
-	pero sin cargar procesos en memoria ni multiplexación.
-
+	Programa principal de GARLIC 1.0.
 ------------------------------------------------------------------------------*/
 #include <nds.h>
+#include <stdio.h>
 
 #include <garlic_system.h>	// definición de funciones y variables de sistema
 
 #include <GARLIC_API.h>		// inclusión del API para simular un proceso
 #include <Sprites_sopo.h>
 
-int hola(int);				// función que simula la ejecución del proceso
-extern int prnt(int);		// otra función (externa) de test correspondiente
-							// a un proceso de usuario
-extern int dnif(int);
-
 extern int * punixTime;		// puntero a zona de memoria con el tiempo real
-
-void spriteMove2(unsigned char n, short px, short py, unsigned char zocalo);
-void clear_screen();
-void prova_estatica();
-void prova_dinamica();
-void prova_canvis();
-void prova_dvd();
+void pruevas_progG();
 void check_params(int zocalo, unsigned char n, unsigned char icon, 
 	short px, short py, unsigned visible);
-
 
 /* Inicializaciones generales del sistema Garlic */
 //------------------------------------------------------------------------------
 void inicializarSistema() {
 //------------------------------------------------------------------------------
+	
+	_gd_seed = *punixTime;	// inicializar semilla para números aleatorios con
+	_gd_seed <<= 16;		// el valor de tiempo real UNIX, desplazado 16 bits
+	
+	// ------- Inicializaciones progG -------
 	int v;
 
 	_gg_iniGrafA();			// inicializar procesador gráfico A
 	for (v = 0; v < 4; v++)	// para todas las ventanas
 		_gd_wbfs[v].pControl = 0;		// inicializar los buffers de ventana
 	
-	_gd_seed = *punixTime;	// inicializar semilla para números aleatorios con
-	_gd_seed <<= 16;		// el valor de tiempo real UNIX, desplazado 16 bits
+	// ------- Inicializaciones progP -------
+	int i;
+
+	irqInitHandler(_gp_IntrMain);	// instalar rutina principal interrupciones
+	irqSet(IRQ_VBLANK, _gp_rsiVBL);	// instalar RSI de vertical Blank
+	irqEnable(IRQ_VBLANK);			// activar interrupciones de vertical Blank
+	REG_IME = IME_ENABLE;			// activar las interrupciones en general
+	
+	for (i = 0; i<8; i++)		// Inicialitzacions de les bústies
+	{
+	_gd_mailboxes[i].head = 0;
+	_gd_mailboxes[i].tail = 0;
+	_gd_mailboxes[i].count = 0;
+	}
+	
+	_gd_pcbs[0].keyName = 0x4C524147;	// "GARL"
+
+	// ------- Inicializaciones progM -------
+	if (!_gm_initFS())
+	{
+		printf("ERROR: ¡no se puede inicializar el sistema de ficheros!");
+		exit(0);
+	}
+}
+
+/**
+ * Función que carga un programa a partir de su nombre (4 carácteres)
+ * con el argumento especificado, muestra la dirección de arranque y espera
+ * a que el usuario presione 'START' para iniciar el programa.
+ * Parametros
+ *	prog: nombre del programa (4 carácteres)
+ *	arg: argumento con el que cargar el programa
+ *  ventana: número [0..3] de la ventana a la que dirigir la salida
+ * Retorna:
+ *	Dirección en la que se ha cargado el programa
+ */
+intFunc cargarPrograma(char prog[4], int arg, int zocalo) 
+{
+	intFunc start = _gm_cargarPrograma(prog);
+	if (start) 
+	{	
+		_gg_escribir("\n ** Programa: %s\n\n", (unsigned int)prog, 0, zocalo % 4);
+		_gp_crearProc(start, zocalo, prog, arg);
+	} 
+	else
+	{ 
+		_gg_escribir("\n* ERROR al cargar %s(%d)\n", (unsigned int)prog, (unsigned int)arg, zocalo % 4);
+	}
+	return start;
 }
 
 
 //------------------------------------------------------------------------------
 int main(int argc, char **argv) {
 //------------------------------------------------------------------------------
-	
+
 	inicializarSistema();
 	
 	_gg_escribir("********************************", 0, 0, 0);
@@ -56,72 +97,19 @@ int main(int argc, char **argv) {
 	_gg_escribir("* Sistema Operativo GARLIC 1.0 *", 0, 0, 0);
 	_gg_escribir("*                              *", 0, 0, 0);
 	_gg_escribir("********************************", 0, 0, 0);
-	_gg_escribir("*** Inicio fase 1_G\n", 0, 0, 0);
+	_gg_escribir("*** Inicio fase GARLIC\n", 0, 0, 0);
 
-	// Programes usuari hola / prnt
-	_gd_pidz = 6;	// simular zócalo 6
-	hola(0);
-	_gd_pidz = 7;	// simular zócalo 7
-	hola(2);
-	_gd_pidz = 5;	// simular zócalo 5
-	prnt(1);
-	
-	clear_screen();
-
-	// Proves Sprites
-	_gd_pidz = 0;
-	prova_estatica();
-	_gd_pidz = 1;
-	prova_dinamica();
-	_gd_pidz = 2;
-	prova_canvis();
-	_gd_pidz = 3;
-	prova_dvd();
-	
-	clear_screen();
-	// Proves DNIF
-	_gd_pidz = 0;
-	dnif(0);
-	dnif(1);
-	_gd_pidz = 1;
-	dnif(1);
-	dnif(0);
-	_gd_pidz = 2;
-	dnif(3);
-	dnif(5);
-
-	_gg_escribir("*** Final fase 1_G\n", 0, 0, 0);
+	pruevas_progG();
+	cargarPrograma("PRNT", 5, 1);
+	cargarPrograma("DNIF", 0, 2);
+	cargarPrograma("COLZ", 0, 3);
+	cargarPrograma("MMLL", 1, 4);
+	cargarPrograma("HOLA", 2, 6);
 
 	while (1)
 	{
-		swiWaitForVBlank();
-	}							// parar el procesador en un bucle infinito
-	return 0;
-}
-
-
-/* Proceso de prueba */
-//------------------------------------------------------------------------------
-int hola(int arg) {
-//------------------------------------------------------------------------------
-	unsigned int i, j, iter;
-	
-	if (arg < 0) arg = 0;			// limitar valor máximo y 
-	else if (arg > 3) arg = 3;		// valor mínimo del argumento
-	
-									// esccribir mensaje inicial
-	GARLIC_printf("-- Programa HOLA  -  PID (%d) --\n", GARLIC_pid());
-	
-	j = 1;							// j = cálculo de 10 elevado a arg
-	for (i = 0; i < arg; i++)
-		j *= 10;
-						// cálculo aleatorio del número de iteraciones 'iter'
-	GARLIC_divmod(GARLIC_random(), j, &i, &iter);
-	iter++;							// asegurar que hay al menos una iteración
-	
-	for (i = 0; i < iter; i++)		// escribir mensajes
-		GARLIC_printf("(%d)\t%d: Hello world!\n", GARLIC_pid(), i);
-
+		_gp_WaitForVBlank();
+	}
 	return 0;
 }
 
@@ -133,70 +121,88 @@ void check_params(int zocalo, unsigned char n, unsigned char icon,
 	short px, short py, unsigned visible)
 {
 	int idx_global = (zocalo * MAX_SPRITE_PROC) + n;
-	GARLIC_printf("\n* Valor Esperado - Vector *\n");
-	GARLIC_printf("\n> Zocalo: %d - %d\n", zocalo, _gd_sprites[idx_global].zocalo);
-	GARLIC_printf("\n> Sprite idx: %d - %d\n", idx_global, _gd_sprites[idx_global].n);
-	GARLIC_printf("\n> Icon: %d - %d\n", icon, _gd_sprites[idx_global].icon);
-	GARLIC_printf("\n> Pos. : [%d,%d] - ", px, py);
-	GARLIC_printf("[%d,%d]\n", _gd_sprites[idx_global].px, _gd_sprites[idx_global].py);
-	GARLIC_printf("\n> Visib. %d - %d\n", visible, _gd_sprites[idx_global].visible);
+	_gg_escribir("\n\n> Zocalo: %d - %d", zocalo, _gd_sprites[idx_global].zocalo, zocalo);
+	_gg_escribir("\n> Sprite idx: %d - %d", n, _gd_sprites[idx_global].n, zocalo);
+	_gg_escribir("\n> Icon: %d - %d", icon, _gd_sprites[idx_global].icon, zocalo);
+	_gg_escribir("\n> Pos. : [%d,%d] - ", px, py, zocalo);
+	_gg_escribir("[%d,%d]", _gd_sprites[idx_global].px, _gd_sprites[idx_global].py, zocalo);
+	_gg_escribir("\n> Visib. %d - %d", visible, _gd_sprites[idx_global].visible, zocalo);
 }
 
-// Crea un Sprite a unes coordenades x,y
-void prova_estatica()
- {
+void pruevas_progG()
+{
 	unsigned char n, icon, visible;
 	short px, py;
 	int zocalo;
 	
-	zocalo = _gd_pidz;
-	GARLIC_printf("\n*** Prueba Estatica ***\n");
-	
-	n = 0; icon =0; px = 48; py = 32; visible = 1;
-	GARLIC_spriteSet(n, icon);
-	GARLIC_spriteMove(n, px, py);
-	GARLIC_spriteShow(n);
-	_gg_actualiza_sprites(); swiWaitForVBlank();
+	// ------- Prueba 1: Posiciones -------
+	zocalo = 0;
+	_gg_escribir("\n\n*** Prueba 1\n", 0, 0, zocalo);
+	_gg_escribir("\n\n* Valor Esperado - Vector *\n", 0, 0, zocalo);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+		
+	n = 0; icon = 0; px = 48; py = 32; visible = 1;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
 	check_params(zocalo, n, icon, px, py, visible);
-	
-	n = 1; icon =9; px = 176; py = 32; visible = 1;
-	GARLIC_spriteSet(n, icon);
-	GARLIC_spriteMove(n, px, py);
-	GARLIC_spriteShow(n);
-	_gg_actualiza_sprites(); swiWaitForVBlank();
+	for (int i = 0; i < 75; i++)
+		_gp_WaitForVBlank();
+		
+	n = 1; icon = 1; px = 176; py = 32; visible = 1;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
 	check_params(zocalo, n, icon, px, py, visible);
-	
-	n = 2; icon =8; px = 48; py = 80; visible = 1;
-	GARLIC_spriteSet(n, icon);
-	GARLIC_spriteMove(n, px, py);
-	GARLIC_spriteShow(n);
-	_gg_actualiza_sprites(); swiWaitForVBlank();
+	for (int i = 0; i < 75; i++)
+		_gp_WaitForVBlank();
+		
+	n = 2; icon = 2; px = 48; py = 80; visible = 1;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
 	check_params(zocalo, n, icon, px, py, visible);
-	
-	GARLIC_spriteHide(0);
-	GARLIC_spriteHide(1);
-	GARLIC_spriteHide(2);
-	_gg_actualiza_sprites(); swiWaitForVBlank();
-	GARLIC_printf("\n*** Final Prueba Estatica ***\n");
- }
- 
- // Desplaca un Sprite durant 60 iteracions
- void prova_dinamica()
- {
-	unsigned char n, icon, visible;
-	short px, py;
-	int zocalo;
-	
-	zocalo = _gd_pidz;
-	GARLIC_printf("\n*** Prueba Dinamica ***\n");
-	
-	n = 3; icon = 10; px = 48; py = 32; visible = 1;
-	int idx_global = (zocalo * MAX_SPRITE_PROC) + n;
-	GARLIC_spriteSet(n, icon);
-	GARLIC_spriteMove(n, px, py);
-	GARLIC_spriteShow(n);
-	_gg_actualiza_sprites(); swiWaitForVBlank();
+	for (int i = 0; i < 75; i++)
+		_gp_WaitForVBlank();
+		
+	n = 3; icon = 3; px = -300; py = 300; visible = 1;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
 	check_params(zocalo, n, icon, px, py, visible);
+	for (int i = 0; i < 75; i++)
+		_gp_WaitForVBlank();
+		
+	// Mover sprite 0 a la pos 0,0
+	n = 0; px = 0; py = 0; visible = 1;
+	_gg_spriteMove(n, px, py, zocalo);
+	check_params(zocalo, n, icon, px, py, visible);
+	_gg_escribir("\n\n*** Fin Prueba 1\n", 0, 0, zocalo);
+	
+	for (int i = 0; i < 75; i++)
+		_gp_WaitForVBlank();
+		
+	_gg_spriteHide(0, zocalo);
+	_gg_spriteHide(1, zocalo);
+	_gg_spriteHide(2, zocalo);
+	_gg_spriteHide(3, zocalo);
+	
+	// ------- Prueba 2: Movimiento -------
+	zocalo = 1;
+	_gg_escribir("\n\n*** Prueba 2\n", 0, 0, zocalo);
+	_gg_escribir("\n\n* Valor Esperado - Vector *\n", 0, 0, zocalo);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+	
+	n = 4; icon = 10; px = 48; py = 32; visible = 1;
+	int idx_global = (zocalo * 8) + n;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
+	check_params(zocalo, n, icon, px, py, visible);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
 	
 	short dir = 2;
 	for (int i = 0; i < 60; i++) {
@@ -204,62 +210,58 @@ void prova_estatica()
 			dir = -dir;
 		}
 		py += dir;
-		GARLIC_spriteMove(n, px, py);
-		_gg_actualiza_sprites(); swiWaitForVBlank();
-		GARLIC_printf("\n> Pos. : [%d,%d] - ", px, py);
-		GARLIC_printf("[%d,%d]\n", _gd_sprites[idx_global].px, _gd_sprites[idx_global].py);
+		_gg_spriteMove(n, px, py, zocalo);
+		_gg_escribir("\n> Pos. : [%d,%d] - ", px, py, zocalo);
+		_gg_escribir("[%d,%d]", _gd_sprites[idx_global].px, _gd_sprites[idx_global].py, zocalo);
 	}
-	GARLIC_spriteHide(n);
-	_gg_actualiza_sprites(); swiWaitForVBlank();
-	GARLIC_printf("\n*** Final Prueba Dinamica ***\n");
-}
-
-// Canvia la icona de un sprite n cada 60 iteracions 5 cops
- void prova_canvis()
- {
-	unsigned char n, icon, visible;
-	short px, py;
-	int zocalo;
 	
-	zocalo = _gd_pidz;
-	GARLIC_printf("\n**** Prueba Canvis ***\n");
+	_gg_escribir("\n\n*** Fin Prueba 2\n", 0, 0, zocalo);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+	_gg_spriteHide(n, zocalo);	
 	
-	n = 4; icon = 7; px = 48; py = 32; visible = 1;
-	int idx_global = (zocalo * MAX_SPRITE_PROC) + n;
-	GARLIC_spriteSet(n, icon);
-	GARLIC_spriteMove(n, px, py);
-	GARLIC_spriteShow(n);
-	_gg_actualiza_sprites(); swiWaitForVBlank();
+	// ------- Prueba 3: Cambio de indice -------
+	zocalo = 2;
+	_gg_escribir("\n\n*** Prueba 3\n", 0, 0, zocalo);	
+	_gg_escribir("\n\n* Valor Esperado - Vector *\n", 0, 0, zocalo);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+		
+	n = 5; icon = 12; px = 48; py = 32; visible = 1;
+	idx_global = (zocalo * 8) + n;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
 	check_params(zocalo, n, icon, px, py, visible);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
 	
 	for (int i = 0; i < 300; i++) {
 		if (i%60 == 0 && i != 0) {
 			icon++;
+			_gg_spriteSet(n, icon, zocalo);
+			_gg_spriteShow(n, zocalo);
+			_gg_escribir("\n> Icon: %d - %d\n", icon, _gd_sprites[idx_global].icon, zocalo);
+			for (int i = 0; i < 50; i++)
+				_gp_WaitForVBlank();
 			
-			GARLIC_spriteSet(n, icon);
-			GARLIC_printf("\n> Icon: %d - %d\n", icon, _gd_sprites[idx_global].icon);
 		}
-		_gg_actualiza_sprites(); swiWaitForVBlank();
 	}
-	GARLIC_spriteHide(n);
-	_gg_actualiza_sprites(); swiWaitForVBlank();
-	GARLIC_printf("\n*** Final Prueba Canvis ***\n");
-}
-
-// DVD SCREENSAVER, mou el sprite i el rebota en la finestra
-// El sprite global no podria fer aixo amb la funcio _gg_mueveSprite
- void prova_dvd()
-{
-	unsigned char n, icon, visible;
-	short px, py;
-	unsigned char n2, icon2;
-	short px2, py2;
-	int zocalo;
 	
-	_gd_pidz = 3;
-	zocalo = _gd_pidz;
-	GARLIC_printf("\n**** Prueba DVD ***\n");
+	_gg_escribir("\n\n*** Fin Prueba 3\n", 0, 0, zocalo);
+	
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+		
+	_gg_spriteHide(n, zocalo);
 
+	// ------- Prueba 4: Movimiento en region -------
+	zocalo = 3;
+	_gg_escribir("\n\n*** Prueba 4\n", 0, 0, zocalo);
+	_gg_escribir("\n\n* Valor Esperado - Vector *\n", 0, 0, zocalo);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+	
 	// Ventana
 	short maxX = 128 - 32;
 	short maxY = 96 - 32;
@@ -267,29 +269,17 @@ void prova_estatica()
 	short minY = 0;
 	short dirX = 2;
 	short dirY = 1;
-	// Global
-	short maxXG = 128 - 32;
-	short maxYG = 96 - 32;
-	short minXG = -128;
-	short minYG = -96;
-	short dirXG = -6;
-	short dirYG = -3;
 	
-	n = 5; icon = 3; px = minX; py = minY; visible = 1;
-	int idx_global = (zocalo * MAX_SPRITE_PROC) + n;
-	GARLIC_spriteSet(n, icon);
-	GARLIC_spriteMove(n, px, py);
-	GARLIC_spriteShow(n);
-	_gg_actualiza_sprites(); swiWaitForVBlank();
+	n = 6; icon = 3; px = minX; py = minY; visible = 1;
+	idx_global = (zocalo * 8) + n;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
 	check_params(zocalo, n, icon, px, py, visible);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
 	
-	n2 = 6; icon2 = 8; px2 = -16; py2 = -16;
-	GARLIC_spriteSet(n2, icon2);
-	GARLIC_spriteMove(n2, px2, py2);
-	GARLIC_spriteShow(n2);
-	_gg_actualiza_sprites(); swiWaitForVBlank();
-	
-	for (int i = 0; i < 150; i++) {
+	for (int i = 0; i < 200; i++) {
 		// VENTANA
 		px += dirX;
 		py += dirY;
@@ -309,60 +299,21 @@ void prova_estatica()
 			py = minY;
 			dirY = -dirY;
 		}
-		
-		// GLOBAL
-		px2 += dirXG;
-		py2 += dirYG;
-		
-		if (px2 >= maxXG) {
-			px2 = maxXG;
-			dirXG = -dirXG;
-		} else if (px2 <= minXG) {
-			px2 = minXG;
-			dirXG = -dirXG;
-		}
-		
-		if (py2 >= maxYG) {
-			py2 = maxYG;
-			dirYG = -dirYG;
-		} else if (py2 <= minYG) {
-			py2 = minYG;
-			dirYG = -dirYG;
-		}
-		spriteMove2(n2, px2, py2, zocalo);
-				
-		// VENTANA
-		GARLIC_spriteMove(n, px, py);
-		GARLIC_printf("\n> Pos. : [%d,%d] - ", px, py);
-		GARLIC_printf("[%d,%d]\n", _gd_sprites[idx_global].px, _gd_sprites[idx_global].py);
-		_gg_actualiza_sprites(); swiWaitForVBlank();
-		
+		_gg_spriteMove(n, px, py, zocalo);
+		_gg_escribir("\n> Pos. : [%d,%d] - ", px, py, zocalo);
+		_gg_escribir("[%d,%d]\n", _gd_sprites[idx_global].px, _gd_sprites[idx_global].py, zocalo);
 	}
-	GARLIC_spriteHide(n);
-	GARLIC_spriteHide(n2);
-	_gg_actualiza_sprites(); swiWaitForVBlank();
-	GARLIC_printf("\n*** Final Prueba Canvis ***\n");
-}
-
-void spriteMove2(unsigned char n, short px, short py, unsigned char zocalo) {
-
-    if (n >= MAX_SPRITE_PROC) {
-        return;
-    }
-
-    // Index global de sprites
-    int idx_global = (zocalo * MAX_SPRITE_PROC) + n;
 	
-    // Actualitzar vector de sprites
-    _gd_sprites[idx_global].px = px;
-    _gd_sprites[idx_global].py = py;
-    //SPR_mueve_sprite(idx_global, abs_px, abs_py);
-}
-
-// Neteja les 4 finestres posant caracter buit
-void clear_screen() {
+	_gg_escribir("\n\n*** Fin Prueba 4\n", 0, 0, zocalo);
+	
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+		
+	_gg_spriteHide(n, zocalo);
+		
 	for (int i = 0; i < 4; i++) {
-		_gd_pidz = i;
-		GARLIC_clearScreen();
+		_gg_clearScreen(i);
 	}
+	for (int i = 0; i < 25; i++)
+		_gp_WaitForVBlank();
 }

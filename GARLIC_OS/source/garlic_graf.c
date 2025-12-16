@@ -369,17 +369,18 @@ void _gg_spriteMove(unsigned char n, short px, short py, unsigned char zocalo) {
 	
 	// Delimitar
 	if (px < -32)
-		px = -32;
-	else if (px > 256)
-		px = 256;
-	else if (py < -32)
-		py = -32;
-	else if (py > 192)
-		py = 192;
+		px = 0;
+	if (px > 256)
+		px = 0;
+	if (py < -32)
+		py = 0;
+	if (py > 192)
+		py = 0;
 
     // Actualitzar vector de sprites
     _gd_sprites[idx_global].px = px;
     _gd_sprites[idx_global].py = py;
+	_gg_actualiza_sprites();
 }
 
 void _gg_spriteShow(unsigned char n, unsigned char zocalo) {
@@ -393,6 +394,8 @@ void _gg_spriteShow(unsigned char n, unsigned char zocalo) {
 	
     //Actualitzar vector de sprites
     _gd_sprites[idx_global].visible = 1;
+	_gg_actualiza_sprites();
+	
 }
 
 
@@ -406,6 +409,7 @@ void _gg_spriteHide(unsigned char n, unsigned char zocalo) {
     int idx_global = (zocalo * MAX_SPRITE_PROC) + n;
     //Actualitzar vector de sprites
 	_gd_sprites[idx_global].visible = 0;
+	_gg_actualiza_sprites();
 }
 
 
