@@ -1,10 +1,10 @@
 /*------------------------------------------------------------------------------
 
-	"main.c" : fase 1 / programador P
+	"main.c" : fase 1 + programador G
+	"main.c" : fase 1 + programador P
+	"main.c" : fase 1 / programador M
 
-	Programa de prueba de creación y multiplexación de procesos en GARLIC 1.0,
-	pero sin cargar procesos en memoria ni utilizar llamadas a _gg_escribir().
-
+	Programa principal de GARLIC 1.0.
 ------------------------------------------------------------------------------*/
 #include <nds.h>
 #include <stdio.h>
@@ -12,29 +12,31 @@
 #include <garlic_system.h>	// definición de funciones y variables de sistema
 
 #include <GARLIC_API.h>		// inclusión del API para simular un proceso
-int hola(int);				// función que simula la ejecución del proceso
-int colz(int);				// funció que simula l'execució del procés collatz
-unsigned int power_of_10(int exp); // funció auxiliar per a colz
-int proc_sender_bustia0(int arg);
-int proc_receiver_bustia0(int arg);
-int proc_filler_bustia1(int arg);
-int proc_drainer_bustia1(int arg);
-
+#include <Sprites_sopo.h>
 
 extern int * punixTime;		// puntero a zona de memoria con el tiempo real
-
+void pruevas_progG();
+void check_params(int zocalo, unsigned char n, unsigned char icon, 
+	short px, short py, unsigned visible);
 
 /* Inicializaciones generales del sistema Garlic */
 //------------------------------------------------------------------------------
 void inicializarSistema() {
 //------------------------------------------------------------------------------
-	int i;
-
-	consoleDemoInit();		// inicializar consola, sólo para esta simulación
 	
 	_gd_seed = *punixTime;	// inicializar semilla para números aleatorios con
 	_gd_seed <<= 16;		// el valor de tiempo real UNIX, desplazado 16 bits
 	
+	// ------- Inicializaciones progG -------
+	int v;
+
+	_gg_iniGrafA();			// inicializar procesador gráfico A
+	for (v = 0; v < 4; v++)	// para todas las ventanas
+		_gd_wbfs[v].pControl = 0;		// inicializar los buffers de ventana
+	
+	// ------- Inicializaciones progP -------
+	int i;
+
 	irqInitHandler(_gp_IntrMain);	// instalar rutina principal interrupciones
 	irqSet(IRQ_VBLANK, _gp_rsiVBL);	// instalar RSI de vertical Blank
 	irqEnable(IRQ_VBLANK);			// activar interrupciones de vertical Blank
@@ -46,362 +48,272 @@ void inicializarSistema() {
 	_gd_mailboxes[i].tail = 0;
 	_gd_mailboxes[i].count = 0;
 	}
-
 	
 	_gd_pcbs[0].keyName = 0x4C524147;	// "GARL"
+
+	// ------- Inicializaciones progM -------
+	if (!_gm_initFS())
+	{
+		printf("ERROR: ¡no se puede inicializar el sistema de ficheros!");
+		exit(0);
+	}
+}
+
+/**
+ * Función que carga un programa a partir de su nombre (4 carácteres)
+ * con el argumento especificado, muestra la dirección de arranque y espera
+ * a que el usuario presione 'START' para iniciar el programa.
+ * Parametros
+ *	prog: nombre del programa (4 carácteres)
+ *	arg: argumento con el que cargar el programa
+ *  ventana: número [0..3] de la ventana a la que dirigir la salida
+ * Retorna:
+ *	Dirección en la que se ha cargado el programa
+ */
+intFunc cargarPrograma(char prog[4], int arg, int zocalo) 
+{
+	intFunc start = _gm_cargarPrograma(prog);
+	if (start) 
+	{	
+		_gg_escribir("\n ** Programa: %s\n\n", (unsigned int)prog, 0, zocalo % 4);
+		_gp_crearProc(start, zocalo, prog, arg);
+	} 
+	else
+	{ 
+		_gg_escribir("\n* ERROR al cargar %s(%d)\n", (unsigned int)prog, (unsigned int)arg, zocalo % 4);
+	}
+	return start;
 }
 
 
 //------------------------------------------------------------------------------
 int main(int argc, char **argv) {
 //------------------------------------------------------------------------------
-	int tics_espera, i;
-	
+
 	inicializarSistema();
 	
-	printf("********************************");
-	printf("* *");
-	printf("* Sistema Operativo GARLIC 1.0 *");
-	printf("* *");
-	printf("********************************");
-	printf("*** Inicio fase 1_P\n");
-	
-	// -----------------------------------------------------------------
-	// JOC DE PROVES ORIGINAL
-	// -----------------------------------------------------------------
-	_gp_crearProc(hola, 7, "HOLA", 1);
-	_gp_crearProc(hola, 14, "HOLA", 2);
+	_gg_escribir("********************************", 0, 0, 0);
+	_gg_escribir("*                              *", 0, 0, 0);
+	_gg_escribir("* Sistema Operativo GARLIC 1.0 *", 0, 0, 0);
+	_gg_escribir("*                              *", 0, 0, 0);
+	_gg_escribir("********************************", 0, 0, 0);
+	_gg_escribir("*** Inicio fase GARLIC\n", 0, 0, 0);
 
-	while (_gp_numProc() > 1)
-	{
-		_gp_WaitForVBlank();
-		printf("*** Test HOLA (PID 0) %d:%d\n", _gd_tickCount, _gp_numProc());
-		
-	}																		// esperar a que terminen los procesos de usuario
-
-	printf("*** Final fase 1_P (Test HOLA acabat)\n");
-	printf("\n*** JOC DE PROVES ADDICIONAL ***\n\n");
-	
-	// -----------------------------------------------------------------
-	// TEST 1: Programa d'usuari 'colz'
-	// -----------------------------------------------------------------
-	printf("--- TEST 1: Creant 2 proc. 'colz' ---\n");
-	_gp_crearProc(colz, 6, "COLZ", 1); // arg=1 -> limit 10^6
-	_gp_crearProc(colz, 9, "COLZ", 2); // arg=2 -> limit 10^7
-
-	// Esperem que acabin els 2 processos 'colz'
-	
-	printf("Esperant que acabin els proc. 'colz'...\n"); 
-	while (_gp_numProc() > 1) {
-		_gp_WaitForVBlank(); 
-
-		
-		if ((_gd_tickCount % 60) == 0) {
-			printf("*** Test COLZ (PID 0) %d:%d\n", _gd_tickCount, _gp_numProc());
-		}
-		
-		for (i = 0; i < 100; i++) {											// Ralentim l'execució.
-			_gp_WaitForVBlank();
-		}
-		
-	}
-	printf("--- TEST 1: 'colz' finalitzat ---\n\n");
-
-	// -----------------------------------------------------------------
-	// TEST 2: Bústies (Test de Bloqueig i Desbloqueig)
-	// -----------------------------------------------------------------
-	printf("--- TEST 2: Creant RECEPTOR a BUSTIA0 (es bloquejara)...\n");
-	_gp_crearProc(proc_receiver_bustia0, 7, "RECV0", 0); // Zócalo 7
-
-	// Deixem 1 segon (aprox 60 tics) perquè el receptor s'executi i es bloquegi
-	tics_espera = _gd_tickCount + 60;
-	while (_gd_tickCount < tics_espera && _gp_numProc() > 1) {
-		 _gp_WaitForVBlank();
-		 printf("*** Test BÚSTIA 2 (PID 0) %d:%d\n", _gd_tickCount, _gp_numProc());
-		 
-		 for (i = 0; i < 100; i++) {											// Ralentim l'execució.
-			_gp_WaitForVBlank();
-		}
-	}
-	
-	printf("--- TEST 2: Creant EMISSOR a BUSTIA0 (desbloquejara RECEPTOR)...\n");
-	_gp_crearProc(proc_sender_bustia0, 14, "SEND0", 0);
-
-	// Esperem que acabin els dos
-	while (_gp_numProc() > 1) {
-		_gp_WaitForVBlank();
-		printf("*** Test BÚSTIA 2 (PID 0) %d:%d\n", _gd_tickCount, _gp_numProc());
-		
-		for (i = 0; i < 100; i++) {											// Ralentim l'execució.
-			_gp_WaitForVBlank();
-		}
-	}
-	printf("--- TEST 2: Send/Receive finalitzat ---\n\n");
-
-	// -----------------------------------------------------------------
-	// TEST 3: Bústies (Test de Bústia Plena i Buidat)
-	// -----------------------------------------------------------------
-	printf("--- TEST 3: Creant FILLER per omplir BUSTIA1...\n");
-	_gp_crearProc(proc_filler_bustia1, 5, "FILL1", 0);
-	
-	// Esperem que el FILLER acabi
-	while (_gp_numProc() > 1) {
-		_gp_WaitForVBlank();
-		printf("*** Test BUSTIA 3 (PID 0) %d:%d\n", _gd_tickCount, _gp_numProc());
-		
-		for (i = 0; i < 100; i++) {											// Ralentim l'execució.
-			_gp_WaitForVBlank();
-		}
-	}
-	printf("--- TEST 3: FILLER ha acabat. BUSTIA1 hauria d'estar plena.\n");
-
-	printf("--- TEST 3: Creant DRAINER per buidar BUSTIA1...\n");
-	_gp_crearProc(proc_drainer_bustia1, 6, "DRAIN1", 0);
-
-	// Esperem que el DRAINER acabi
-	while (_gp_numProc() > 1) {
-		_gp_WaitForVBlank();
-		printf("*** Test BUSTIA 3 (PID 0) %d:%d\n", _gd_tickCount, _gp_numProc());
-		
-		for (i = 0; i < 100; i++) {											// Ralentim l'execució.
-			_gp_WaitForVBlank();
-		}
-	}
-	printf("--- TEST 3: DRAINER ha acabat.\nBUSTIA1 hauria d'estar buida.\n\n");
-	printf("*** TOTS ELS JOCS DE PROVA FINALITZATS ***\n");
+	pruevas_progG();
+	cargarPrograma("PRNT", 5, 1);
+	cargarPrograma("DNIF", 0, 2);
+	cargarPrograma("COLZ", 0, 3);
+	cargarPrograma("MMLL", 1, 4);
+	cargarPrograma("HOLA", 2, 6);
 
 	while (1)
 	{
 		_gp_WaitForVBlank();
-	}							// parar el procesador en un bucle infinito
+	}
 	return 0;
 }
 
-
-/* Proceso de prueba, con llamadas a las funciones del API del sistema Garlic */
 //------------------------------------------------------------------------------
-int hola(int arg) {
+// JOC DE PROVES PROG G - SPRITES
 //------------------------------------------------------------------------------
-	unsigned int i, j, iter;
-	
-	if (arg < 0) arg = 0;			// limitar valor máximo y 
-	else if (arg > 3) arg = 3;		// valor mínimo del argumento
-	
-									// escribir mensaje inicial
-	GARLIC_printf("-- Programa HOLA  -  PID (%d) --\n", GARLIC_pid());
-	
-	j = 1;							// j = cálculo de 10 elevado a arg
-	for (i = 0; i < arg; i++)
-		j *= 10;
-						// cálculo aleatorio del número de iteraciones 'iter'
-	GARLIC_divmod(GARLIC_random(), j, &i, &iter);
-	iter++;							// asegurar que hay al menos una iteración
-	
-	for (i = 0; i < iter; i++)		// escribir mensajes
-		GARLIC_printf("(%d)\t%d: Hello world!\n", GARLIC_pid(), i);
-
-	return 0;
-}
-
-// --------------------------FUNCIONALITATS ADDICIONALS-------------------------
-
-/* Procés Emissor (Bústia 0): Envia 2 valors i acaba */
-int proc_sender_bustia0(int arg) {
-	int ret;
-	int i; 
-	GARLIC_printf("SENDER_bustia0(PID %d): Iniciant...\n\n", GARLIC_pid());
-	
-	// Enviar una dada
-	GARLIC_printf("SENDER_bustia0(PID %d):\n123 a BUSTIA0...\n\n", GARLIC_pid());
-	ret = GARLIC_send(0, 123); // Envia 123 a bústia 0
-	GARLIC_printf("SENDER_bustia0(PID %d):\nHa retornat %d (esperat 1)\n\n", GARLIC_pid(), ret);
-
-	// Esperar una mica (per provar el buffer)
-	for(i = 0; i < 30; i++) _gp_WaitForVBlank(); 
-
-	// Enviar una altra dada
-	GARLIC_printf("SENDER_bustia0(PID %d):\n456 a BUSTIA0...\n\n", GARLIC_pid());
-	ret = GARLIC_send(0, 456); // Envia 456 a bústia 0
-	GARLIC_printf("SENDER_bustia0(PID %d):\nHa retornat %d (esperat 1)\n\n", GARLIC_pid(), ret);
-
-	GARLIC_printf("SENDER_bustia0(PID %d):\nFinalitzant.\n\n", GARLIC_pid());
-	return 0;
-}
-
-/* Procés Receptor (Bústia 0): Rep 2 valors (el primer bloquejant) i acaba */
-int proc_receiver_bustia0(int arg) {
-	int data;
-	GARLIC_printf("RECEIVER_bustia0(PID %d):\nIniciant...\n\n", GARLIC_pid());
-
-	// Rebre la primera dada (hauria de bloquejar)
-	GARLIC_printf("RECEIVER_bustia0(PID %d):\nEsperant dada de BUSTIA0 (bloquejant)\n\n", GARLIC_pid());
-	data = GARLIC_receive(0); // Rep de bústia 0
-	GARLIC_printf("RECEIVER_bustia0(PID %d):\nRebuda dada: %d (esperat 123)\n\n", GARLIC_pid(), data);
-
-	// Rebre la segona dada (hauria d'estar al buffer)
-	GARLIC_printf("RECEIVER_bustia0(PID %d):\nEsperant 2a dada de BUSTIA0 (no hauria de bloquejar)\n\n", GARLIC_pid());
-	data = GARLIC_receive(0); // Rep de bústia 0
-	GARLIC_printf("RECEIVER_bustia0(PID %d):\nRebuda 2a dada: %d (esperat 456)\n\n", GARLIC_pid(), data);
-
-	GARLIC_printf("RECEIVER_bustia0(PID %d):\nFinalitzant.\n\n", GARLIC_pid());
-	return 0;
-}
-
-/* Procés "Filler" (Bústia 1): Omple la bústia i prova l'error de "ple" */
-int proc_filler_bustia1(int arg) {
-	int i, ret;
-	GARLIC_printf("FILLER_bustia1(PID %d):\nOmplint bustia 1\n\n", GARLIC_pid());
-	
-	// Omplim les 16 posicions
-	for (i = 0; i < 16; i++) {
-		ret = GARLIC_send(1, i + 1000); // Envia 1000, 1001, ..., 1015
-		if (ret == 0) {
-			GARLIC_printf("FILLER_bustia1(PID %d): ERROR\nEnviament %d ha fallat!\n\n", GARLIC_pid(), i);
-		}
-	}
-	GARLIC_printf("FILLER_bustia1(PID %d):\nBustia 1 plena (16 elements).\n\n", GARLIC_pid());
-
-	// Intentem enviar el 17è (hauria de fallar)
-	ret = GARLIC_send(1, 9999);
-	GARLIC_printf("FILLER_bustia1(PID %d):\nIntentant enviar a bustia plena...\nRetorn: %d (esperat 0)\n\n", GARLIC_pid(), ret);
-
-	GARLIC_printf("FILLER_bustia1(PID %d):\nFinalitzant.\n\n", GARLIC_pid());
-	return 0;
-}
-
-/* Procés "Drainer" (Bústia 1): Buidar la bústia */
-int proc_drainer_bustia1(int arg) {
-	int y = 0;
-	int data = 0;
-	int z = 0;
-	GARLIC_printf("DRAINER_bustia1(PID %d):\nBuidant bustia 1\n\n", GARLIC_pid());
-
-	// Buidem les 16 posicions
-	for (y = 0; y < 16; y++) {
-		data = GARLIC_receive(1); // Rep de bústia 1
-		GARLIC_printf("DRAINER_bustia1(PID %d):Rebuda dada %d\n\n", GARLIC_pid(), data);
-		
-		for (z = 0; z < 50; z++) {											// Ralentim l'execució.
-			_gp_WaitForVBlank();
-		}
-		
-	}
-	GARLIC_printf("DRAINER_bustia1(PID %d):\nBustia 1 buida.\n\n", GARLIC_pid());
-
-	GARLIC_printf("DRAINER_bustia1(PID %d):\nFinalitzant.\n\n", GARLIC_pid());
-	return 0;
-}
-
-
-// ---------------------------PROGRAMA D'USUARI --------------------------------
-
-// Funcio per calcular potències de 10.
-// Parametres: El valor del exponent a calcular.
-// Retorn: 10^exp.
-unsigned int power_of_10(int exp)
+// Rutina per veure els parametres dels sprites
+void check_params(int zocalo, unsigned char n, unsigned char icon, 
+	short px, short py, unsigned visible)
 {
-	unsigned int result = 1;
-	int i;
-	for (i = 0; i<exp; i++)
-	{	
-		if (result > 0xFFFFFFFF / 10)			// Mirem si hi ha overflow. En cas de que n'hi hagi, retornem el valor maxim de 32 bits. (0xFFFFFFFF);
-		{
-			return 0xFFFFFFFF;
-		}
-		result *= 10;
-	}
-	return result;
+	int idx_global = (zocalo * MAX_SPRITE_PROC) + n;
+	_gg_escribir("\n\n> Zocalo: %d - %d", zocalo, _gd_sprites[idx_global].zocalo, zocalo);
+	_gg_escribir("\n> Sprite idx: %d - %d", n, _gd_sprites[idx_global].n, zocalo);
+	_gg_escribir("\n> Icon: %d - %d", icon, _gd_sprites[idx_global].icon, zocalo);
+	_gg_escribir("\n> Pos. : [%d,%d] - ", px, py, zocalo);
+	_gg_escribir("[%d,%d]", _gd_sprites[idx_global].px, _gd_sprites[idx_global].py, zocalo);
+	_gg_escribir("\n> Visib. %d - %d", visible, _gd_sprites[idx_global].visible, zocalo);
 }
 
-
-int colz(int arg)
+void pruevas_progG()
 {
-	unsigned int limit, random_num, n, num_actual, passos = 0, quocient, residu;
-	int exponent;
+	unsigned char n, icon, visible;
+	short px, py;
+	int zocalo;
 	
-	if (arg < 0) arg = 0;												// Validem i ajustem l'argument.
-	else if (arg > 3) arg = 3;
-	
-	GARLIC_printf("--- Programa COLZ (PID %d) ---\n", GARLIC_pid());	// Mostrem per pantalla quin procès està executant el programa.
-	GARLIC_printf("Argument rebut: %d\n", arg);							// Mostrem per pantalla quin argument ha rebut el programa.
-	
-	
-	// Calculem el  límit = 10^(arg+5)
-	exponent = arg+5;
-	limit = power_of_10(exponent);
-	if (limit == 0xFFFFFFFF && exponent > 0)							// Mirem si hi ha overflow al calcular el límit.
-	{
-		GARLIC_printf("Avís: El limit 10^%d desborda 32 bits!\n\n", exponent);
-	}
-	GARLIC_printf("Limit superior: %d (10^%d)\n\n", limit, exponent);
-	
-	
-	// Generem número aleatori n = GARLIC_random() % limit
-	if (limit == 0)
-	{
-		n = 0;
-	}
-	else
-	{
-		// Calculem random_num % limit.
-		random_num = GARLIC_random();
-		GARLIC_divmod(random_num, limit, &quocient, &n);
-	}
-	
-	GARLIC_printf("Numero aleatori generat n = %d\n\n", n);
-	
-	// Comprovem la conjuctura de Collatz per n
-	num_actual = n;
-	
-	if (num_actual == 0)
-	{
-		GARLIC_printf("n = 0, no s'aplica la sequencia.\n\n");
-	}
-	else
-	{
-		GARLIC_printf("Iniciant Collatz per %d...\n\n", num_actual);
-		unsigned int max_passos = 100000;								// Límit de passos per evitar bucles infinits.
+	// ------- Prueba 1: Posiciones -------
+	zocalo = 0;
+	_gg_escribir("\n\n*** Prueba 1\n", 0, 0, zocalo);
+	_gg_escribir("\n\n* Valor Esperado - Vector *\n", 0, 0, zocalo);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
 		
-		while (num_actual > 1 && passos < max_passos)
-		{
-			GARLIC_divmod(num_actual, 2, &quocient, &residu);			// Comprovem si és parell.
-				
-			if(residu == 0)												// És parell.
-			{
-				num_actual = quocient;
-			}
-			else														// És senar
-			{
-				// Comprovem el desbordament ABANS de multiplicar (només 32 bits)
-				// Si num_actual > (MAX_INT - 1) / 3, llavors 3*n+1 desbordarà
-				if (num_actual > 1431655765) // 1431655765 és (0xFFFFFFFF - 1) / 3
-				{
-					GARLIC_printf("ATENCIO: Desbordament calculant 3n+1!\n\n");
-					passos = max_passos;
-					break;
-				}
-
-				// Ara sabem que és segur multiplicar amb 32 bits
-				num_actual = 3 * num_actual + 1;
-			}
-			passos++;
-		}
+	n = 0; icon = 0; px = 48; py = 32; visible = 1;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
+	check_params(zocalo, n, icon, px, py, visible);
+	for (int i = 0; i < 75; i++)
+		_gp_WaitForVBlank();
 		
-		if (num_actual == 1)
-		{
-			GARLIC_printf("Sequencia feta en %d passos.\n\n", passos);
+	n = 1; icon = 1; px = 176; py = 32; visible = 1;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
+	check_params(zocalo, n, icon, px, py, visible);
+	for (int i = 0; i < 75; i++)
+		_gp_WaitForVBlank();
+		
+	n = 2; icon = 2; px = 48; py = 80; visible = 1;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
+	check_params(zocalo, n, icon, px, py, visible);
+	for (int i = 0; i < 75; i++)
+		_gp_WaitForVBlank();
+		
+	n = 3; icon = 3; px = -300; py = 300; visible = 1;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
+	check_params(zocalo, n, icon, px, py, visible);
+	for (int i = 0; i < 75; i++)
+		_gp_WaitForVBlank();
+		
+	// Mover sprite 0 a la pos 0,0
+	n = 0; px = 0; py = 0; visible = 1;
+	_gg_spriteMove(n, px, py, zocalo);
+	check_params(zocalo, n, icon, px, py, visible);
+	_gg_escribir("\n\n*** Fin Prueba 1\n", 0, 0, zocalo);
+	
+	for (int i = 0; i < 75; i++)
+		_gp_WaitForVBlank();
+		
+	_gg_spriteHide(0, zocalo);
+	_gg_spriteHide(1, zocalo);
+	_gg_spriteHide(2, zocalo);
+	_gg_spriteHide(3, zocalo);
+	
+	// ------- Prueba 2: Movimiento -------
+	zocalo = 1;
+	_gg_escribir("\n\n*** Prueba 2\n", 0, 0, zocalo);
+	_gg_escribir("\n\n* Valor Esperado - Vector *\n", 0, 0, zocalo);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+	
+	n = 4; icon = 10; px = 48; py = 32; visible = 1;
+	int idx_global = (zocalo * 8) + n;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
+	check_params(zocalo, n, icon, px, py, visible);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+	
+	short dir = 2;
+	for (int i = 0; i < 60; i++) {
+		if (i%10 == 0) {
+			dir = -dir;
 		}
-		else if (passos >= max_passos)
-		{
-			GARLIC_printf("Aturat despres de %d passos (limit assolit).\n\n", max_passos);
-		}
-		else
-		{
-			GARLIC_printf("Error inesperat, no s'ha arribat a 1.\n\n");
+		py += dir;
+		_gg_spriteMove(n, px, py, zocalo);
+		_gg_escribir("\n> Pos. : [%d,%d] - ", px, py, zocalo);
+		_gg_escribir("[%d,%d]", _gd_sprites[idx_global].px, _gd_sprites[idx_global].py, zocalo);
+	}
+	
+	_gg_escribir("\n\n*** Fin Prueba 2\n", 0, 0, zocalo);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+	_gg_spriteHide(n, zocalo);	
+	
+	// ------- Prueba 3: Cambio de indice -------
+	zocalo = 2;
+	_gg_escribir("\n\n*** Prueba 3\n", 0, 0, zocalo);	
+	_gg_escribir("\n\n* Valor Esperado - Vector *\n", 0, 0, zocalo);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+		
+	n = 5; icon = 12; px = 48; py = 32; visible = 1;
+	idx_global = (zocalo * 8) + n;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
+	check_params(zocalo, n, icon, px, py, visible);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+	
+	for (int i = 0; i < 300; i++) {
+		if (i%60 == 0 && i != 0) {
+			icon++;
+			_gg_spriteSet(n, icon, zocalo);
+			_gg_spriteShow(n, zocalo);
+			_gg_escribir("\n> Icon: %d - %d\n", icon, _gd_sprites[idx_global].icon, zocalo);
+			for (int i = 0; i < 50; i++)
+				_gp_WaitForVBlank();
+			
 		}
 	}
 	
-	GARLIC_printf("--- FI PROGRAMA COLZ (PID %d) ---\n", GARLIC_pid());
+	_gg_escribir("\n\n*** Fin Prueba 3\n", 0, 0, zocalo);
+	
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+		
+	_gg_spriteHide(n, zocalo);
 
-	return 0;
+	// ------- Prueba 4: Movimiento en region -------
+	zocalo = 3;
+	_gg_escribir("\n\n*** Prueba 4\n", 0, 0, zocalo);
+	_gg_escribir("\n\n* Valor Esperado - Vector *\n", 0, 0, zocalo);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+	
+	// Ventana
+	short maxX = 128 - 32;
+	short maxY = 96 - 32;
+	short minX = 0;
+	short minY = 0;
+	short dirX = 2;
+	short dirY = 1;
+	
+	n = 6; icon = 3; px = minX; py = minY; visible = 1;
+	idx_global = (zocalo * 8) + n;
+	_gg_spriteSet(n, icon, zocalo);
+	_gg_spriteMove(n, px, py, zocalo);
+	_gg_spriteShow(n, zocalo);
+	check_params(zocalo, n, icon, px, py, visible);
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+	
+	for (int i = 0; i < 200; i++) {
+		// VENTANA
+		px += dirX;
+		py += dirY;
+		
+		if (px >= maxX) {
+			px = maxX;
+			dirX = -dirX;
+		} else if (px <= minX) {
+			px = minX;
+			dirX = -dirX;
+		}
+		
+		if (py >= maxY) {
+			py = maxY;
+			dirY = -dirY;
+		} else if (py <= minY) {
+			py = minY;
+			dirY = -dirY;
+		}
+		_gg_spriteMove(n, px, py, zocalo);
+		_gg_escribir("\n> Pos. : [%d,%d] - ", px, py, zocalo);
+		_gg_escribir("[%d,%d]\n", _gd_sprites[idx_global].px, _gd_sprites[idx_global].py, zocalo);
+	}
+	
+	_gg_escribir("\n\n*** Fin Prueba 4\n", 0, 0, zocalo);
+	
+	for (int i = 0; i < 50; i++)
+		_gp_WaitForVBlank();
+		
+	_gg_spriteHide(n, zocalo);
+		
+	for (int i = 0; i < 4; i++) {
+		_gg_clearScreen(i);
+	}
+	for (int i = 0; i < 25; i++)
+		_gp_WaitForVBlank();
 }
