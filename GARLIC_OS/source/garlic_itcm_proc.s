@@ -16,8 +16,8 @@
 	
 	.global _gp_WaitForVBlank
 	@; rutina para pausar el procesador mientras no se produzca una interrupción
-	@; de retrazado vertical (VBL); es un sustituto de la "swi #5", que evita
-	@; la necesidad de cambiar a modo supervisor en los procesos GARLIC
+	@; de retroceso vertical (VBL); es un sustituto de la "swi #5" que evita
+	@; la necesidad de cambiar a modo supervisor en los procesos GARLIC;
 _gp_WaitForVBlank:
 	push {r0-r1, lr}
 	ldr r0, =__irq_flags
@@ -32,7 +32,7 @@ _gp_WaitForVBlank:
 
 
 	.global _gp_IntrMain
-	@; Manejador principal de interrupciones del sistema Garlic
+	@; Manejador principal de interrupciones del sistema Garlic;
 _gp_IntrMain:
 	mov	r12, #0x4000000
 	add	r12, r12, #0x208	@; R12 = base registros de control de interrupciones	
@@ -80,10 +80,10 @@ _gp_rsiVBL:
 		str r5, [r4]				@; Guardem el valor modificat.
 		
 		@; Comprovar si hi ha algun procés a la cua nReady.
-		@;ldr r6, =_gd_nReady			@; Carregum l'adreça de la variable de nombre de processos a la cua.
-		@;ldr r7, [r6]				@; Carreguem el valor de la variable.
-		@;cmp r7, #0					@; Mirem si hi han processos a la cua.
-		@;beq .Lfinal					@; Si no hi han processos a la cua, finalitzem la RSI.
+		ldr r6, =_gd_nReady			@; Carregum l'adreça de la variable de nombre de processos a la cua.
+		ldr r7, [r6]				@; Carreguem el valor de la variable.
+		cmp r7, #0					@; Mirem si hi han processos a la cua.
+		beq .Lfinal					@; Si no hi han processos a la cua, finalitzem la RSI.
 		
 		@; Comprovar si el procés no és del S.O i el seu PID és 0.
 		ldr r4, =_gd_pidz			@; Carreguem adreça de la variable PID i sòcol del procés actual.
@@ -278,15 +278,18 @@ _gp_restaurarProc:
 	
 	
 	.global _gp_numProc
-	@; Retorna el nombre total de processos en el sistema (Procés en Run + Processos en Ready)
-	@; Resultado
+	@;Resultado
 	@; R0: número de procesos total
 _gp_numProc:
-	push {r1, lr}
-		ldr r1, =_gd_nReady			@; Carreguem direcció de variable de nombre de processos en Ready.
-		ldr r1, [r1]				@; Carreguem el valor de la variable.
-		add r0, r1, #1				@; Retornem per R0 (Nombre de processos Ready + 1) per tenir en compte el procés en estat Run.
-	pop {r1, pc}
+	push {r1-r2, lr}
+	mov r0, #1				@; contar siempre 1 proceso en RUN
+	ldr r1, =_gd_nReady
+	ldr r2, [r1]			@; R2 = número de procesos en cola de READY
+	add r0, r2				@; añadir procesos en READY
+	ldr r1, =_gd_nDelay
+	ldr r2, [r1]			@; R2 = número de procesos en cola de DELAY
+	add r0, r2				@; añadir procesos retardados
+	pop {r1-r2, pc}
 
 
 	.global _gp_crearProc
@@ -385,19 +388,89 @@ _gp_crearProc:
 	@; de multiplexación de procesos no salve el estado del proceso terminado.
 _gp_terminarProc:
 	ldr r0, =_gd_pidz
-	ldr r1, [r0]					@; R1 = valor actual de PID + zócalo
-	and r1, r1, #0xf				@; R1 = zócalo del proceso desbancado
-	str r1, [r0]					@; guardar zócalo con PID = 0, para no salvar estado			
+	ldr r1, [r0]			@; R1 = valor actual de PID + zócalo
+	and r1, r1, #0xf		@; R1 = zócalo del proceso desbancado
+	bl _gp_inhibirIRQs
+	str r1, [r0]			@; guardar zócalo con PID = 0, para no salvar estado			
 	ldr r2, =_gd_pcbs
 	mov r10, #24
 	mul r11, r1, r10
-	add r2, r11						@; R2 = dirección base _gd_pcbs[zocalo]
+	add r2, r11				@; R2 = dirección base _gd_pcbs[zocalo]
 	mov r3, #0
-	str r3, [r2]					@; pone a 0 el campo PID del PCB del proceso
+	str r3, [r2]			@; pone a 0 el campo PID del PCB del proceso
+	str r3, [r2, #20]		@; borrar porcentaje de USO de la CPU
+	ldr r0, =_gd_sincMain
+	ldr r2, [r0]			@; R2 = valor actual de la variable de sincronismo
+	mov r3, #1
+	mov r3, r3, lsl r1		@; R3 = máscara con bit correspondiente al zócalo
+	orr r2, r3
+	str r2, [r0]			@; actualizar variable de sincronismo
+	bl _gp_desinhibirIRQs
 .LterminarProc_inf:
-	bl _gp_WaitForVBlank			@; pausar procesador
-	b .LterminarProc_inf			@; hasta asegurar el cambio de contexto
+	bl _gp_WaitForVBlank	@; pausar procesador
+	b .LterminarProc_inf	@; hasta asegurar el cambio de contexto
 	
+	
+	.global _gp_matarProc
+	@; Rutina para destruir un proceso de usuario:
+	@; borra el PID del PCB del zócalo referenciado por parámetro, para indicar
+	@; que esa entrada del vector _gd_pcbs está libre; elimina el índice de
+	@; zócalo de la cola de READY o de la cola de DELAY, esté donde esté;
+	@; Parámetros:
+	@;	R0:	zócalo del proceso a matar (entre 1 y 15).
+_gp_matarProc:
+	push {lr}
+
+
+	pop {pc}
+
+	
+	.global _gp_retardarProc
+	@; retarda la ejecución de un proceso durante cierto número de segundos,
+	@; colocándolo en la cola de DELAY
+	@;Parámetros
+	@; R0: int nsec
+_gp_retardarProc:
+	push {lr}
+
+
+	pop {pc}			@; no retornará hasta que se haya agotado el retardo
+
+
+	.global _gp_inihibirIRQs
+	@; pone el bit IME (Interrupt Master Enable) a 0, para inhibir todas
+	@; las IRQs y evitar así posibles problemas debidos al cambio de contexto
+_gp_inhibirIRQs:
+	push {lr}
+
+
+	pop {pc}
+
+
+	.global _gp_desinihibirIRQs
+	@; pone el bit IME (Interrupt Master Enable) a 1, para desinhibir todas
+	@; las IRQs
+_gp_desinhibirIRQs:
+	push {lr}
+
+
+	pop {pc}
+
+
+	.global _gp_rsiTIMER0
+	@; Rutina de Servicio de Interrupción (RSI) para contabilizar los tics
+	@; de trabajo de cada proceso: suma los tics de todos los procesos y calcula
+	@; el porcentaje de uso de la CPU, que se guarda en los 8 bits altos de la
+	@; entrada _gd_pcbs[z].workTicks de cada proceso (z) y, si el procesador
+	@; gráfico secundario está correctamente configurado, se imprime en la
+	@; columna correspondiente de la tabla de procesos.
+_gp_rsiTIMER0:
+	push {lr}
+
+	
+	pop {pc}
+
+
 	
 	.global _ga_send
 	@; Rutina per enviar una dada de tipus int a la bústia indicada per paràmetre.

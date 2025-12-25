@@ -73,11 +73,11 @@ typedef struct				// Estructura del buffer de una ventana
 	int pControl;			//	control de escritura en ventana
 							//		16 bits altos: número de línea (0-23)
 							//		16 bits bajos: caracteres pendientes (0-32)
-	short pChars[32];		//	vector de 32 caracteres pendientes de escritura
-							//		indicando el código ASCII de cada posición
+	char pChars[32];		//	vector de 32 caracteres pendientes de escritura
++							//		indicando el código ASCII de cada posición
 } PACKED garlicWBUF;
 
-extern garlicWBUF _gd_wbfs[16];	// vector con los buffers de 4 ventanas
+extern garlicWBUF _gd_wbfs[4];	// vector con los buffers de 4 ventanas
 
 
 extern int _gd_stacks[15*128];	// vector con las pilas de los procesos activos
@@ -176,22 +176,12 @@ extern void _gp_rsiTIMER0();
 */
 extern int _gm_initFS();
 
-/* _gm_listaProgs: devuelve una lista con los nombres en clave de todos
-				los programas que se encuentran en el directorio "Programas".
-				Se considera que un fichero es un programa si su nombre tiene
-				8 car?cteres y termina con ".elf"; se devuelven solo los
-				4 primeros car?cteres del nombre del fichero (nombre en clave),
-				que por convenio deben estar en may?sculas;
-				el resultado es un vector de strings (paso por referencia) y
-				el n?mero de programas detectados; */
-extern int _gm_listaProgs(char* progs[]);
-
 /* _gm_cargarPrograma: busca un fichero de nombre "(keyName).elf" dentro del
 					directorio "/Programas/" del sistema de ficheros y carga
 					los segmentos de programa a partir de una posici?n de
 					memoria libre, efectuando la reubicaci?n de las referencias
 					a los s?mbolos del programa seg?n el desplazamiento del
-					c?digo y los datos en la memoria destino;
+					código en la memoria destino;
 	Par?metros:
 		zocalo	->	?ndice del z?calo que indexar? el proceso del programa
 		keyName ->	string de 4 car?cteres con el nombre en clave del programa
@@ -199,7 +189,7 @@ extern int _gm_listaProgs(char* progs[]);
 		!= 0	->	direcci?n de inicio del programa (intFunc)
 		== 0	->	no se ha podido cargar el programa
 */
-extern intFunc _gm_cargarPrograma(int zocalo, char *keyName);
+extern intFunc _gm_cargarPrograma(char *keyName);
 
 /* _gm_do_malloc: funció auxiliar 1 progM per reservar memòria dinàmica per a un procés */
 extern void *_gm_do_malloc(unsigned int size, int zocalo);
@@ -215,35 +205,10 @@ extern int _gm_do_free(void *ptr, int zocalo);
 /* _gm_reubicar: rutina de soporte a _gm_cargarPrograma(), que interpreta los
 					'relocs' de un fichero ELF contenido en un buffer *fileBuf,
 					y ajusta las direcciones de memoria correspondientes a las
-					referencias de tipo R_ARM_ABS32, a partir de las direcciones
-					de memoria destino de c?digo (dest_code) y datos (dest_data)
-					y seg?n el valor de las direcciones de las referencias a
-					reubicar y de las direcciones de inicio de los segmentos de
-					c?digo (pAddr_code) y datos (pAddr_data); */
-extern void _gm_reubicar(char *fileBuf,
-							unsigned int pAddr_code, unsigned int *dest_code,
-							unsigned int pAddr_data, unsigned int *dest_data);
-							
-/* _gm_reservarMem: rutina para reservar un conjunto de franjas de memoria 
-				libres consecutivas que proporcionen un espacio suficiente para
-				albergar el tama?o de un segmento de c?digo o datos del proceso
-				(seg?n indique tipo_seg), asignando al n?mero de z?calo que se
-				pasa por par?metro;
-				la rutina devuelve la primera direcci?n del espacio reservado; 
-				en el caso de que no quede un espacio de memoria consecutivo del
-				tama?o requerido, devuelve cero; */
-extern void * _gm_reservarMem(int z, int tam, unsigned char tipo_seg);
-
-
-/* _gm_liberarMem: rutina para liberar todas las franjas de memoria asignadas
-				al proceso del z?calo indicado por par?metro; */
-extern void _gm_liberarMem(int z);
-
-
-/* _gm_rsiTIMER1:	servicio de interrupciones del TIMER1 de la plataforma NDS,
-				que refrescar? peri?dicamente la informaci?n de la tabla de
-				procesos relativa al uso de la pila y el estado del proceso; */
-extern void _gm_rsiTIMER1();
+					referencias de tipo R_ARM_ABS32, restando la dirección de
+					inicio de segmento (pAddr) y sumando la dirección de destino
+					en la memoria (*dest) */
+extern void _gm_reubicar(char *fileBuf, unsigned int pAddr, unsigned int *dest);
 
 
 //------------------------------------------------------------------------------
@@ -253,10 +218,9 @@ extern void _gm_rsiTIMER1();
 /* _gg_iniGraf: inicializa el procesador gráfico A para GARLIC 1.0 */
 extern void _gg_iniGrafA();
 
+/* _gg_generarMarco: dibuja el marco de la ventana que se indica por parámetro*/
+extern void _gg_generarMarco(int v);
 
-/* _gg_generarMarco: dibuja el marco de la ventana que se indica por par?metro,
-												con el color correspondiente; */
-extern void _gg_generarMarco(int v, int color);
 
 
 /* _gg_escribir: escribe una cadena de caracteres en la ventana indicada;
@@ -299,42 +263,6 @@ extern void _gg_escribirLinea(int v, int f, int n);
 */
 extern void _gg_desplazar(int v);
 
-/* _gg_escribirCar: escribe un car?cter (baldosa) en la posici?n de la ventana
-				indicada, con un color concreto;
-	Par?metros:
-		vx		->	coordenada x de ventana (0..31)
-		vy		->	coordenada y de ventana (0..23)
-		c		->	c?digo del car?cter, como n?mero de baldosa (0..127)
-		color	->	color del texto (0..3)
-		ventana	->	n?mero de ventana (0..15)
-*/
-extern void _gg_escribirCar(int vx, int vy, char c, int color, int ventana);
-
-
-/* _gg_escribirMat: escribe una matriz de 8x8 car?cteres a partir de una
-				posici?n de la ventana indicada, con un color concreto;
-	Par?metros:
-		vx		->	coordenada x inicial de ventana (0..31)
-		vy		->	coordenada y inicial de ventana (0..23)
-		m		->	matriz 8x8 de c?digos ASCII
-		color	->	color del texto (0..3)
-		ventana	->	n?mero de ventana (0..15)
-*/
-extern void _gg_escribirMat(int vx, int vy, char m[][8], int color, int ventana);
-
-
-/* _gg_escribirLineaTabla: escribe los campos b?sicos de una l?nea de la tabla
-				de procesos, correspondiente al n?mero de z?calo que se pasa por
-				par?metro con el color especificado; los campos a escribir son:
-					n?mero de z?calo, PID y nombre clave del proceso (keyName);
-*/
-extern void _gg_escribirLineaTabla(int z, int color);
-
-
-/* _gg_rsiTIMER2:	servicio de interrupciones del TIMER2 de la plataforma NDS,
-				que refrescar? peri?dicamente la informaci?n de la tabla de
-				procesos relativa a la direcci?n actual de ejecuci?n; */
-extern void _gg_rsiTIMER2();
 
 
 //------------------------------------------------------------------------------
@@ -420,32 +348,6 @@ extern void _gs_pintarFranjas(unsigned char zocalo, unsigned short index_ini,
 */
 extern void _gs_representarPilas();
 
-//------------------------------------------------------------------------------
-//	Rutinas de soporte a la interficie de usuario (garlic_itcm_ui.s)
-//------------------------------------------------------------------------------
-extern int _gi_za;				// z?calo seleccionado actualmente
-
-
-/* _gi_movimientoVentanas:	actualiza el desplazamiento y escalado de los
-				fondos 2 y 3 del procesador gr?fico A, para efectuar los
-				movimientos de las ventanas seg?n el comportamiento
-				requerido de la interficie de usuario; */
-extern void _gi_movimientoVentanas();
-
-
-/* _gi_redibujarZocalo: rutina para actualizar la tabla de z?calos en funci?n
-				del z?calo actual (_gi_za) y del par?metro (seleccionar):
-					si seleccionar == 0, dibuja la l?nea de _gi_za seg?n el
-											color asociado al estado del z?calo
-											(blanco -> activo, salm?n -> libre);
-					sino, 				dibuja la l?nea en magenta;
-*/
-extern void _gi_redibujarZocalo(int seleccionar);
-
-
-/* _gi_controlInterfaz: rutina para gestionar la interfaz del usuario a partir
-				del c?digo de tecla que se pasa por par?metro; */
-extern void _gi_controlInterfaz(int key);
 
 //------------------------------------------------------------------------------
 //	FUNCIONALITATS ADDICIONALS: Bústies (Mailboxes)
