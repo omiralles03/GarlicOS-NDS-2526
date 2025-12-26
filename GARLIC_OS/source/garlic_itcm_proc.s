@@ -5,6 +5,19 @@
 @;
 @;==============================================================================
 
+@; CONSTANTS DEL SISTEMA I OFFSETS DEL PCB
+
+IME = 0x4000208				@; Adreça del REG_IME
+VBLANK_FREQ = 60			@; Freqüènia de refresc de la pantalla
+
+PCB_PID = 0
+PCB_PC = 4
+PCB_SP = 8
+PCB_STATUS = 12
+PCB_KEY = 16
+PCB_TICKS = 20				@; Els tics als 24 baixos i ús de CPU als 8 alts
+PCB_SIZE = 24				@; Mida total del struct
+
 .section .itcm,"ax",%progbits
 
 	.arm
@@ -419,10 +432,99 @@ _gp_terminarProc:
 	@; Parámetros:
 	@;	R0:	zócalo del proceso a matar (entre 1 y 15).
 _gp_matarProc:
-	push {lr}
+	push {r0-r8, lr}
+		
+		@; Validem el sòcol
+		cmp r0, #0
+		beq .Lfi_matar				@; No podem matar el S.O (sòcol = 0)
+		
+		bl _gp_inhibirIRQs			@; Iniciem secció crítica
+		
+		@; Alliberem el PCB
+		ldr r1, =_gd_pcbs
+		mov r2, #PCB_SIZE			@; Tamany total del PCB en bytes
+		mul r2, r0, r2				@; Desplaçament (Num. sòcol * Tamany PCB)
+		add r1, r1, r2				@; Punter al PCB (adreça base + desplaçament)
+		mov r2, #0					@; Preparem el 0 pel PID
+		str r2, [r1, #PCB_PID]		@; Posem PID = 0 per marcar el sòcol com a lliure
+		
+		@; Buscar i eliminar de la cua de Ready
+		ldr r1, =_gd_nReady
+		ldr r2, [r1]				@; Comptador de la cua de ready
+		ldr r3, =_gd_qReady
+		mov r4, #0					@; R4 = index (i)
+		
+		.Lbucle_ready:
+			cmp r4, r2				@; Hem acabat de mirar la cua
+			bge .Lfi_ready
+			ldrb r5, [r3, r4]		@; Carreguem qReady[i]
+			cmp r5, r0				@; Mirem si és el sòcol que volem matar
+			beq .Lesborrar_ready	@; Saltem a esborrar-lo
+			add r4, r4, #1			@; Incrementem comptador i
+			b .Lbucle_ready
+		
+		@; Desplaçem tots els elements a la dreta del procés cap a l'esquerra
+		.Lesborrar_ready:
+			add r5, r4, #1 			@; R5 = i + 1
+		.Lshift_ready:
+			cmp r5, r2
+			bge .Lfi_shift_ready	@; Si hem acabat de desplaçar, sortim del bucle
+			ldrb r6, [r3, r5]		@; Carreguem la seguent posicio de la cua
+			sub r7, r5, #1			@; Preparem index desplaçat a l'esquerra
+			strb r6, [r3, r7]		@; Guardem
+			add r5, r5, #1			@; Incrementem comptador
+			b .Lshift_ready
+		.Lfi_shift_ready:
+			sub r2, r2, #1			@; nReady--
+			str r2, [r1]			@; Actualitzem la variable global nReady
+		
+		@; Buscar i eliminar el procés de la cua de Delay
+		.Lfi_ready:
+			ldr r1, =_gd_nDelay		
+			ldr r2, [r1]			@; Carreguem nDelay
+			ldr r3, =_gd_qDelay		@; Adreça de la cua de Delay
+			mov r4, #0				@; Inicialitzem comptador pel bucle.
+			
+		.Lbucle_delay:
+			cmp r4, r2				
+			bge .Lfi_delay				@; Hem acabat de mirar la cua
+			ldr r5, [r3, r4, lsl #2]	@; Carreguem qDelay[i] amb el offset dels 4 bytes
+			lsr r6, r5, #16				@; Extraiem els 8 bits alts (núm. de sòcol)
+			and r6, r6, #0xFF			@; Netejem per si hi han bits de més
+			cmp r6, r0
+			beq .Lesborrar_delay		@; Si hem trobat el sòcol, saltem a esborrar
+			add r4, r4, #1				@; Incrementem comptador
+			b .Lbucle_delay
+		
+		@; Desplaçem tots els elements a la dreta del procés cap a l'esquerra
+		.Lesborrar_delay:
+			add r5, r4, #1				@; R5 = i + 1
+		.Lshift_delay:
+			cmp r5, r2
+			bge .Lfi_shift_delay		@; Si hem acabat de desplaçar, sortim
+			ldr r6, [r3, r5, lsl #2]	@; Llegim la seguent posicio
+			sub r7, r5, #1				@; Movem el índex a l'esquerra
+			str r6, [r3, r7, lsl #2]	@; Guardem a la posició anterior
+			add r5, r5, #1				@; Incrementem comptador
+			b .Lshift_delay
+		.Lfi_shift_delay:
+			sub r2, r2, #1				@; nDelay--
+			str r2, [r1]				@; Actualitzem variable global nDelay
+			
+		@; Comprovem si ens hem matat a nosaltres mateixos
+		.Lfi_delay:
+			bl _gp_desinhibirIRQs		@; Fi secció crítica
+			
+			ldr r1, _gd_pidz
+			ldr r1, [r1]
+			and r1, r1, #0xF			@; Filtrem els 4 bits de sòcol
+			cmp r1, r0					
+			bne .Lfi_matar
+			bl _gp_WaitForVBlank		@; Forçem el canvi de context en cas de suicidi
+			
+		.Lfi_matar:	
 
-
-	pop {pc}
+	pop {r0-r8, pc}
 
 	
 	.global _gp_retardarProc
@@ -431,30 +533,71 @@ _gp_matarProc:
 	@;Parámetros
 	@; R0: int nsec
 _gp_retardarProc:
-	push {lr}
-
-
-	pop {pc}			@; no retornará hasta que se haya agotado el retardo
+	push {r0-r5, lr}
+		
+		@; Comprovem que nsec > 0
+		cmp r0, #0
+		ble .Lwait_only				@; Si és 0, només cedim CPU
+		
+		@; Obtenir el sòcol
+		ldr r3, =_gd_pidz
+		ldr r3, [r3]				@; Carreguem el valor de la variable PIDZ
+		and r3, r3, #0xF			@; R3 = Núm. de sòcol (4 bits baixos de PIDZ)
+		cmp r3, #0					@; Mirem si és el S.O
+		beq .Lwait_only				@; Si ho és, només cedim
+		
+		bl _gp_inhibirIRQs			@; Iniciem la secció crítica
+		
+		@; Calcular els tics (nsec * 60)
+		mov r1, #VBLANK_FREQ		@; Carreguem la freq. de refresc
+		mul r2, r0, r1				@; R2 = Tics totals
+		
+		@; Construim el word (8 bits alts = sòcol, 16 bits baixos = tics a retardar)
+		lsl r4, r3, #16				@; Desplaçem el sòcol fins als bits 16..19
+		ldr r1, =0xFFFF				@; 16 bits a 1 
+		and r2, r2, r1				@; Assegurem que els tics ocupin com a molt 16 bits
+		orr r4, r4, r2				@; R4 = (Sòcol << 16) | Tics
+		
+		@; Afegim el word a la cua de _gd_nDelay
+		ldr r0, =_gd_nDelay			@; Adreça de nDelay (comptador de retards a la cua)
+		ldr r1, [r0]				@; Valor de nDelay
+		
+		ldr r5, =_gd_qDelay			@; Adreça de qDelay (la cua de retards)
+		lsl r3, r1, #2				@; Calculem el offset per la cua (nDelay * 4 bytes)
+		str r4, [r5, r3]			@; Guardem a qDelay[nDelay]
+		
+		@; Incrementem el comptador nDelay
+		add r1, r1, #1
+		str r1, [r0]
+		
+		bl _gp_desinhibirIRQs		@; Finalitzem la secció crítica
+		
+		.Lwait_only:
+			bl _gp_WaitForVBlank	@; Cedim la CPU
+		
+	pop {r0-r5, pc}			@; no retornará hasta que se haya agotado el retardo
 
 
 	.global _gp_inihibirIRQs
 	@; pone el bit IME (Interrupt Master Enable) a 0, para inhibir todas
 	@; las IRQs y evitar así posibles problemas debidos al cambio de contexto
 _gp_inhibirIRQs:
-	push {lr}
-
-
-	pop {pc}
+	push {r0-r1, lr}
+		ldr r0, =IME			@; Carreguem l'adreça del IME
+		mov r1, #0				@; Carreguem un 0
+		str r1, [r0]			@; Guardem el 0 a l'adreça del IME
+	pop {r0-r1, pc}
 
 
 	.global _gp_desinihibirIRQs
 	@; pone el bit IME (Interrupt Master Enable) a 1, para desinhibir todas
 	@; las IRQs
 _gp_desinhibirIRQs:
-	push {lr}
-
-
-	pop {pc}
+	push {r0-r1, lr}
+		ldr r0, =IME			@; Carreguem l'adreça del IME
+		mov r1, #1				@; Carreguem un 1
+		str r1, [r0]			@; Guardem el 1 a l'adreça del IME
+	pop {r0-r1, pc}
 
 
 	.global _gp_rsiTIMER0
