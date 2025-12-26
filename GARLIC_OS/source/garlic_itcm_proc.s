@@ -608,10 +608,59 @@ _gp_desinhibirIRQs:
 	@; gráfico secundario está correctamente configurado, se imprime en la
 	@; columna correspondiente de la tabla de procesos.
 _gp_rsiTIMER0:
-	push {lr}
-
-	
-	pop {pc}
+	push {r0-r6, lr}
+		@; Incrementem el comptador de ticks del procés actual
+		ldr r0, = _gd_pidz
+		ldr r0, [r0]
+		and r0, r0, #0xF				@; Carreguem el número de sòcol actual (4 bits baixos del PIDZ)
+		
+		ldr r1, =_gd_pcbs				@; Adreça del vector de PCBs
+		mov r2, #PCB_SIZE				@; Tamany de cada PCB
+		mul r2, r0, r2					@; Calculem desplaçament (núm. sòcol * tamany PCB)
+		add r1, r1, r2					@; Adreça base + desplaçament = Punter al PCB del procés actual
+		
+		ldr r3, [r1, #PCB_TICKS]		@; Carreguem la variable workTicks del PCB
+		add r3, r3, #1					@; Incrementem el comptador de tics
+		str r3, [r1, #PCB_TICKS]		@; Guardem el valor actualitzat
+		
+		@; Calculem el valor total de tics de tots els processos
+		ldr r4, =_gd_pcbs				@; Adreça del vector de PCBs
+		mov r5, #0						@; Acumulador de la suma total
+		mov r6, #0						@; Index del bucle (0..15)
+		
+		.Lloop_suma:
+			ldr r3, [r4, #PCB_TICKS]
+			ldr r2, =0xFFFFFF			@; Màscara pels 24 bits baixos de workTicks
+			and r3, r3, r2				@; Filtrem els 24 bits
+			add r5, r5, r3				@; Sumem al total de tics
+			
+			add r4, r4, #PCB_SIZE		@; Passem al seguent PCB
+			add r6, r6, #1				@; Incrementem index del bucle
+			cmp r6, #16
+			blt .Lloop_suma				@; Mirem si hem acabat el bucle
+			
+		cmp r5, #100
+		blt .Lfi_timer					@; Si encara no sumem 100 tics totals, sortim
+		
+		@; Actualitzem porcentatges i reinciem comptadors
+		ldr r4 = _gd_pcbs
+		mov r6, #0						@; Reiniciem el comptador del bucle
+		
+		.Lloop_calc:
+			ldr r3, [r4, #PCB_TICKS]	@; Carreguem workTicks
+			ldr r2, =0xFFFFFF			@; Màscara per filtrar els 24 bits baixos
+			and r0, r3, r2				@; R0 = Tics actuals (que és igual a %)
+			
+			lsl r0, r0, #24				@; Movem el percentatge als 8 bits alts per guardar a workTicks
+			str r0, [r4, #PCB_TICKS]	@; Guardem el percentatge a workTicks
+			
+			add r4, r4, #PCB_SIZE		@; Passem al seguent PCB
+			add r6, r6, #1				@; Incrementem index del bucle
+			cmp r6, #16					
+			blt .Lloop_calc				@; Comprovem que el index sigui < 16, sino acabem bucle
+		
+		.Lfi_timer:
+	pop {r0-r6, pc}
 
 
 	
