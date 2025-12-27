@@ -38,10 +38,76 @@ _gm_zocMem:	.space NUM_FRANJAS			@; vector de ocupaci�n de franjas mem.
 	@;Resultado:
 	@; cambio de las direcciones de memoria que se tienen que ajustar
 _gm_reubicar:
-	push {lr}
+	push {r4-r11, lr}
 	
+	ldr r4,  [sp, #36]	@; recuperacion "r5" de la pila
+	
+	@; calculo offsets code y data
+	sub r5, r2, r1		
+	sub r6, r4, r3
 
-	pop {pc}
+	mov r4, r0
+	
+	@; buscar la taula de seccions del .elf
+    ldr r7, [r4, #32]	@; e_shoff
+    add r7, r4, r7
+    ldrh r8, [r4, #48]	@; e_shnum
+    ldrh r9, [r4, #46]	@; e_shentsize
+
+.Lbucle_seccions:
+	cmp r8, #0
+    beq .Lfi_reubicacio
+
+    ldr r0, [r7, #4]	@; sh_type
+    cmp r0, #9          @; seccio de reubicació (SHT_REL) ==? 9
+    bne .Lnext_seccio
+
+    ldr r10, [r7, #16]	@;sh_offset
+    add r10, r4, r10
+    ldr r11, [r7, #20]	@;sh_size
+    add r11, r1, r11	
+	
+.Lbucle_reubicadors:
+	cmp r10, r11
+    bge .Lnext_seccio
+
+    ldr r0, [r10], #4    @; r_offset
+    ldr r1, [r10], #4    @; r_info (tipo de reubicación)
+
+    and r1, r1, #0xFF
+    cmp r1, #2           @; tipus R_ARM_ABS32 ? 
+    bne .Lbucle_reubicadors
+
+    @; correccio de l'adreça
+    add r0, r0, r5       @; adreça real a modificar = (r_offset + code offset)
+    ldr r1, [r0]        
+	
+	@;decisio offset aplicable 
+	cmp r3, #0			@; existeix segment dades?
+	beq .Lreub_code
+	cmp r1, r3			@; valor apunta a zona de dades?
+	blo .Lreub_code
+	
+@;aplica offset data
+.Lreub_data:
+	add r1, r1, r6
+	b .Lreub_store
+
+@;aplica offset codi	
+.Lreub_code:
+	add r1, r1, r5
+
+.Lreub_store:
+	str r1, [r0]
+	b .Lbucle_reubicadors
+
+.Lnext_seccio:
+	add r7, r7, r9          @;next SH entry
+    sub r8, r8, #1
+    b .Lbucle_seccions
+	
+.Lfi_reubicacio:
+	pop {r4-r11, pc}
 
 .global _gm_reservarMem
 	@; Rutina para reservar un conjunto de franjas de memoria libres
