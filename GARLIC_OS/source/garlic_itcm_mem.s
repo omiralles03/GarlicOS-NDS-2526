@@ -156,9 +156,36 @@ _gm_reservarMem:
     b .Lbuscar_franges
 
 .Ltrobat:
+	@;calcul index inicial lliure = index final trobat - franges necessaries + 1
+	sub r9, r6, r4
+	add r9, #1
+	
+	mov r1, #0					@; comptador
 
-.Lloop:
-
+.Lloop_marcar:
+	strb r0, [r5, r9]			@; _gm_zocMem[pos] = num_zocalo 
+	add r9, #1
+	add r1, #1
+	cmp r1, r4
+	blt .Lloop_marcar
+	
+	@; restaurar index_ini_lliure
+	sub r9, r9, r4
+	
+	@;pintar pantalla inferior
+	@;_gs_pintarFranjas(zocalo, index_ini, num_franjas, tipo_seg)
+	push {r0-r3}
+	mov r3, r2
+	mov r1, r9
+	mov r2, r4
+	
+	bl _gs_pintarFranjas
+	pop {r0-r3}
+	
+	@;calculo dir. retorno = INI_MEM_PROC + (index_ini * 32)
+	ldr r0, =INI_MEM_PROC
+	add r0, r0, r9, lsl #5
+	pop {r4-r9, pc}
 
 .Lerror_reserva:
 	mov r0, #0

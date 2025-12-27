@@ -17,6 +17,13 @@
 
 #define INI_MEM 0x01002000		// dirección inicial de memoria para programas
 
+//valor p_flags:
+//Código (RE) = 5
+//Datos (RW) = 6
+//Diferencia en el bit 1 (101 i 110)
+#define PF_W 2 
+
+
 #define EI_NIDENT 16
 #define PT_LOAD 1	//tipus de segment -> CARREGABLE a memòria
 						//(ELF) = 1 (entero).
