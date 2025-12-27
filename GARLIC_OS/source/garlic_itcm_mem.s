@@ -126,11 +126,44 @@ _gm_reubicar:
 	@;Resultado
 	@;	R0: direcci�n inicial de memoria reservada (0 si no es posible)
 _gm_reservarMem:
-	push {lr}
+	push {r4- r9, lr}
+
+	@;calcul franges -> num_franges (sencer cap adalt) = (r1 + 31) / 32
+	add r4, r1, #31
+	mov r4, r4, lsr #5
+	
+	ldr r5, =_gm_zocMem
+	mov r6, #0			@; i, index actual 
+	mov r7, #0			@; comptador de franges consecutives lliures
+	
+.Lbuscar_franges:
+	cmp r6, #NUM_FRANJAS
+	bge .Lerror_reserva
+	
+	ldrb r8, [r5, r6]           
+    cmp r8, #0                  @; zócalo franja i =? lliure
+    beq .Lfranja_lliure
+    
+    mov r7, #0                  
+    add r6, #1					@;i+=1, buscar següent
+    b .Lbuscar_franges
+	
+.Lfranja_lliure:
+	add r7, #1
+    cmp r7, r4                  @;suficients franjes consecutives?
+    beq .Ltrobat
+    add r6, #1
+    b .Lbuscar_franges
+
+.Ltrobat:
+
+.Lloop:
 
 
-	pop {pc}
-
+.Lerror_reserva:
+	mov r0, #0
+	pop {r4-r9, pc}
+	
 
 
 	.global _gm_liberarMem

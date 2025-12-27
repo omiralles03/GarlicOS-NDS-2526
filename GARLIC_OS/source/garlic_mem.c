@@ -102,7 +102,78 @@ int _gm_listaProgs(char* progs[])
 */
 intFunc _gm_cargarPrograma(int zocalo, char *keyName)
 {
+	//cargar la ruta del .elf del programa
+	char ruta[32];
+	sprintf(ruta, "/Programas/%s.elf", keyName);
+	
+	FILE *fit = fopen(ruta, "rb");
+	if (fit == NULL){
+		printf("ERROR: intent obrir fitxer %s \n", ruta);
+		return (intFunc)0;
+	} 
+	
+	fseek(fit, 0, SEEK_END);
+	long fsize = ftell(fit); //fsize = mida .elf del programa
+	fseek(fit, 0, SEEK_SET);
+	
+	char *fitBuffer = (char *)malloc(fsize);  
+	if (fitBuffer == NULL){
+		printf("ERROR: reserva espai buffer fitxer \n");
+		fclose(fit);
+		return (intFunc)0;
+	}
+	
+	size_t freadsize = fread(fitBuffer, 1, fsize, fit);
+	if (freadsize != fsize){
+		printf("ERROR: copia contingut fitxer to buffer \n");
+		fclose(fit);
+		free(fitBuffer);
+		return (intFunc)0;
+	}
+	fclose(fit);
+	
+	Elf32_Ehdr *elfHeader = (Elf32_Ehdr *)fitBuffer;
+	Elf32_Phdr *progHeader = (Elf32_Phdr *)(fitBuffer + elfHeader->e_phoff);
+	
+	unsigned int pAddr_code = 0, pAddr_data = 0;
+    unsigned int *dest_code = NULL, *dest_data = NULL;
+	
+	for(int i = 0; i < elfHeader->e_phnum; i++) {
+        if (progHeader[i].p_type != PT_LOAD) continue;
+        
+        unsigned char tipo = (progHeader[i].p_flags & PF_W) ? 1 : 0; // 0: Code (RE), 1: Data (RW)
+        unsigned int *memDest = _gm_reservarMem(zocalo, progHeader[i].p_memsz, tipo); 
+        
+        if (memDest == NULL) {
+            _gm_liberarMem(zocalo);
+            free(fitBuffer);
+            return (intFunc)0;
+        }
 
+        if (tipo == 0) {
+            pAddr_code = progHeader[i].p_paddr;
+            dest_code = memDest;
+        } else {
+            pAddr_data = progHeader[i].p_paddr;
+            dest_data = memDest;
+        }
+
+        //si (p_memsz > p_filesz), existeix part segment en memoria que no 
+			//esta en el arxiu (cas zones .bss), posar-la a valor 0.
+        _gs_copiaMem(fitBuffer + progHeader[i].p_offset, memDest, progHeader[i].p_filesz);
+        if (progHeader[i].p_memsz > progHeader[i].p_filesz) {
+            memset((char *)memDest + progHeader[i].p_filesz, 0, progHeader[i].p_memsz - progHeader[i].p_filesz);
+        }
+    }
+	
+	//calcul entrypoint relatiu al segment de codi
+	unsigned int offset_code = (unsigned int)dest_code - pAddr_code;
+    unsigned int *entryPoint = (unsigned int *)(elfHeader->e_entry + offset_code);
+	
+	_gm_reubicar(fitBuffer, pAddr_code, dest_code, pAddr_data, dest_data);
+	
+	free(fitBuffer);
+	return (intFunc)entryPoint;
 }
 
 
