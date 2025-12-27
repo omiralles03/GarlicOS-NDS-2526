@@ -74,7 +74,7 @@ typedef struct				// Estructura del buffer de una ventana
 							//		16 bits altos: número de línea (0-23)
 							//		16 bits bajos: caracteres pendientes (0-32)
 	char pChars[32];		//	vector de 32 caracteres pendientes de escritura
-+							//		indicando el código ASCII de cada posición
+							//		indicando el código ASCII de cada posición
 } PACKED garlicWBUF;
 
 extern garlicWBUF _gd_wbfs[4];	// vector con los buffers de 4 ventanas
@@ -362,6 +362,9 @@ typedef struct
 	int head;						// Índex principi cua
 	int tail;						// Índex final cua
 	int count;						// Nombre de dades a la cua
+	// VARIABLES ADDICIONALS PER FASE 2
+	char pWaiting[16];				// Cua de processos esperant (sòcols)
+	int nWaiting;					// Comptador de processos a la cua
 } PACKED garlicMailbox;
 
 // Vector global per a les 8 bústies

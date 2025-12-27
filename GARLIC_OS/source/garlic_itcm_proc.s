@@ -18,15 +18,23 @@ PCB_KEY = 16
 PCB_TICKS = 20				@; Els tics als 24 baixos i ús de CPU als 8 alts
 PCB_SIZE = 24				@; Mida total del struct
 
+
+@; CONSTANTS PER LES BÚSTIES
+
+MAILBOX_QUEUE_SIZE = 16
+MB_HEAD = 64
+MB_TAIL = 68
+MB_COUNT = 72
+MB_WAIT = 76
+MB_NWAIT = 92
+MAILBOX_STRUCT_SIZE = 96	@; 64 + 4 + 4 + 4 + 16 + 4 = 96 bytes
+
+
 .section .itcm,"ax",%progbits
 
 	.arm
 	.align 2
-	
-	
-	MAILBOX_QUEUE_SIZE = 16
-	MAILBOX_STRUCT_SIZE = (MAILBOX_QUEUE_SIZE * 4) + 4 + 4 + 4
-	
+		
 	.global _gp_WaitForVBlank
 	@; rutina para pausar el procesador mientras no se produzca una interrupción
 	@; de retroceso vertical (VBL); es un sustituto de la "swi #5" que evita
@@ -86,19 +94,34 @@ _gp_IntrMain:
 	@; se encarga de actualizar los tics, intercambiar procesos, etc.
 _gp_rsiVBL:
 	push {r4-r7, lr}
+		
 		@; Incrementar comptador tics.
 		ldr r4, =_gd_tickCount		@; Carreguem l'adreça de la variable comptador de tics global.
 		ldr r5, [r4] 				@; Carreguem el valor de la variable comptador de tics.
 		add r5, #1					@; Incrementem el valor de la variable.
 		str r5, [r4]				@; Guardem el valor modificat.
 		
+		bl _gp_actualizarDelay		@; FASE 2: Cridem a la funció que actualitza la cua de Delay i desperta els processos si fa falta.
+		
 		@; Comprovar si hi ha algun procés a la cua nReady.
-		ldr r6, =_gd_nReady			@; Carregum l'adreça de la variable de nombre de processos a la cua.
-		ldr r7, [r6]				@; Carreguem el valor de la variable.
-		cmp r7, #0					@; Mirem si hi han processos a la cua.
-		beq .Lfinal					@; Si no hi han processos a la cua, finalitzem la RSI.
+		
+		@; Hi ha algú a la cua READY?
+		ldr r6, =_gd_nReady
+		ldr r7, [r6]
+		cmp r7, #0
+		bne .Lchange_context		@; Si nReady > 0, fem canvi
+
+		@; El procés actual s'està bloquejant?
+		ldr r4, =_gd_pidz
+		ldr r5, [r4]
+		tst r5, #0x80000000			@; Comprovem el bit 31 de la variable PIDZ
+		bne .Lchange_context		@; Si bit 31==1, hem de marxar (encara que nReady=0)
+
+		@; Si no hi ha ningú a Ready I no estic bloquejat -> Continuem
+		b .Lfinal
 		
 		@; Comprovar si el procés no és del S.O i el seu PID és 0.
+		.Lchange_context:
 		ldr r4, =_gd_pidz			@; Carreguem adreça de la variable PID i sòcol del procés actual.
 		ldr r4, [r4]				@; Carreguem el valor de la variable PIDZ.
 		cmp r4, #0					@; Si PIDZ = 0, és el sistema operatiu -> Salvem el seu estat.
@@ -123,7 +146,7 @@ _gp_rsiVBL:
 		bl _gp_restaurarProc		@; Cridem la funció _gp_restaurarProc.
 		
 		
-	@;.Lfinal:
+	.Lfinal:
 	pop {r4-r7, pc}
 
 
@@ -138,67 +161,72 @@ _gp_rsiVBL:
 	.global _gp_salvarProc
 _gp_salvarProc:
 	push {r8-r11, lr}
-		@; Guardar el número de sòcol a la cua de Ready
-		ldr r8, [r6]				@; Carreguem el valor del PID i el número de sòcol del procés a salvar.
-		and r8, r8, #0xF			@; Filtrem els 4 bits baixos (el número de sòcol).
+		@; --- MODIFICACIÓ FASE 2: Comprovar el bit 31  ---
+		ldr r8, [r6]				@; Carreguem el valor de _gd_pidz
+		tst r8, #0x80000000			@; Mirem si el bit 31 está a 1 o no
+		and r8, r8, #0xF			@; Filtrem els 4 bits baixos del PIDZ per quedarn-nos amb el núm de sòcol	
+		bne .Lskip_ready			@; Si el bit 31 estava actiu (Resultat != 0), saltem el procés de guardar a la cua de Ready
+
+		@; Guardem a ready (Només si no està bloquejat)
 		ldr r9, =_gd_qReady			@; Carreguem l'adreça de la cua de Ready.
-		strb r8, [r9, r5]			@; Guardar el número de sòcol a la cua de Ready a la següent posició buida.
+		strb r8, [r9, r5]			@; Guardar el número de sòcol a la cua de Ready.
 		add r5, #1					@; Incrementem el comptador de processos en estat Ready.
 		
-		@; Guardar el valor del PC al vector de PCB
-		ldr r9, =_gd_pcbs			@; Carreguem l'adreça del vector de PCBs.
-		mov r10, #24				@; Desem la dimensió de cadascun de les posicions del struct (6 ints * 4 bytes/int = 24).
-		mla r9, r10, r8, r9			@; Calculem l'adreça de la posició del vector PCB del sòcol actual (Dimensió de cada posició * Número de sòcol + Adreça base del vector PCBs).
-		mov r10, sp					@; Carreguem a R10 el punter de la pila SP en mode IRQ, per tant SP_irq.
-		ldr r8, [r10, #60]			@; Carreguem a R8 el PC del procés a aturar (SP_irq amb un desplaçament de 60).
-		str r8, [r9, #4] 			@; Guardem el valor del PC al segon camp del struct del PCB.
-		
-		@; Guardar el CPSR dins del seu PCB
-		mrs r11, SPSR				@; Carreguem a R11 el SPSR (el CPSR del procés aturat).
-		str r11, [r9, #12]			@; Guardem el SPSR al camp Status del PCB.
-		
-		@; Activar el mode sistema
-		mrs r8, CPSR				@; Carreguem a R8 el CPSR (l'estat actual del processador).
-		orr r8, r8, #0x1F			@; Posem els 5 bits de menys pes del CPSR a 1 (1111b) per activar el mode sistema.
-		msr CPSR, r8				@; Tornem a guardar el CPSR amb el mode sistema actiu.
-		
-		@; Apilar els registres R0-R12 i R14 del procés a aturar.
-		push {r14}					@; Apilem R14 (LR_sys, el Link Register del procés).
-		ldr r8, [r10, #56]    		@; Carrega a R8 el valor de R12 (guardat a [SP_irq + 56])
-		push {r8}             		@; Apila R12 a la pila del procés (SP_sys)
-		ldr r8, [r10, #12]    		@; Carrega a R8 el valor de R11 (guardat a [SP_irq + 12])
-		push {r8}             		@; Apila R11 a la pila del procés
-		ldr r8, [r10, #8]     		@; Carrega a R8 el valor de R10 (guardat a [SP_irq + 8])
-		push {r8}             		@; Apila R10 a la pila del procés
-		ldr r8, [r10, #4]     		@; Carrega a R8 el valor de R9 (guardat a [SP_irq + 4])
-		push {r8}					@; Apila R9 a la pila del procés
-		ldr r8, [r10, #0]     		@; Carrega a R8 el valor de R8 (guardat a [SP_irq + 0])
-		push {r8}             		@; Apila R8 a la pila del procés
-		ldr r8, [r10, #32]    		@; Carrega a R8 el valor de R7 (guardat a [SP_irq + 32])
-		push {r8}             		@; Apila R7 a la pila del procés
-		ldr r8, [r10, #28]    		@; Carrega a R8 el valor de R6 (guardat a [SP_irq + 28])
-		push {r8}             		@; Apila R6 a la pila del procés
-		ldr r8, [r10, #24]    		@; Carrega a R8 el valor de R5 (guardat a [SP_irq + 24])
-		push {r8}             		@; Apila R5 a la pila del procés
-		ldr r8, [r10, #20]    		@; Carrega a R8 el valor de R4 (guardat a [SP_irq + 20])
-		push {r8}             		@; Apila R4 a la pila del procés
-		ldr r8, [r10, #52]   		@; Carrega a R8 el valor de R3 (guardat a [SP_irq + 52])
-		push {r8}             		@; Apila R3 a la pila del procés
-		ldr r8, [r10, #48]    		@; Carrega a R8 el valor de R2 (guardat a [SP_irq + 48])
-		push {r8}             		@; Apila R2 a la pila del procés
-		ldr r8, [r10, #44]    		@; Carrega a R8 el valor de R1 (guardat a [SP_irq + 44])
-		push {r8}             		@; Apila R1 a la pila del procés
-		ldr r8, [r10, #40]    		@; Carrega a R8 el valor de R0 (guardat a [SP_irq + 40])
-		push {r8}             		@; Apila R0 a la pila del procés
-		
-		@; Guardem el valor de R13 (el Stack Pointer) al tercer camp del struct PCB.
-		str r13, [r9, #8]			
-		
-		@; Tornar al mode d'execudció IRQ.
-		mrs r8, CPSR				@; Carreguem el valor del CPSR (estat actual del processador).
-		and r8, r8, #0xFFFFFFE0		@; Reiniciem els 5 bits de menys pes a 0.
-		orr r8, r8, #0x12			@; Posem els 5 bits de menys pes en mode Normal Interrupt Request (10010b = 12h).
-		msr CPSR, r8				@; Guardem el CPSR per confirmar el canvi de mode.
+		.Lskip_ready:	
+			@; Guardar el valor del PC al vector de PCB
+			ldr r9, =_gd_pcbs			@; Carreguem l'adreça del vector de PCBs.
+			mov r10, #24				@; Desem la dimensió de cadascun de les posicions del struct (6 ints * 4 bytes/int = 24).
+			mla r9, r10, r8, r9			@; Calculem l'adreça de la posició del vector PCB del sòcol actual (Dimensió de cada posició * Número de sòcol + Adreça base del vector PCBs).
+			mov r10, sp					@; Carreguem a R10 el punter de la pila SP en mode IRQ, per tant SP_irq.
+			ldr r8, [r10, #60]			@; Carreguem a R8 el PC del procés a aturar (SP_irq amb un desplaçament de 60).
+			str r8, [r9, #4] 			@; Guardem el valor del PC al segon camp del struct del PCB.
+			
+			@; Guardar el CPSR dins del seu PCB
+			mrs r11, SPSR				@; Carreguem a R11 el SPSR (el CPSR del procés aturat).
+			str r11, [r9, #12]			@; Guardem el SPSR al camp Status del PCB.
+			
+			@; Activar el mode sistema
+			mrs r8, CPSR				@; Carreguem a R8 el CPSR (l'estat actual del processador).
+			orr r8, r8, #0x1F			@; Posem els 5 bits de menys pes del CPSR a 1 (1111b) per activar el mode sistema.
+			msr CPSR, r8				@; Tornem a guardar el CPSR amb el mode sistema actiu.
+			
+			@; Apilar els registres R0-R12 i R14 del procés a aturar.
+			push {r14}					@; Apilem R14 (LR_sys, el Link Register del procés).
+			ldr r8, [r10, #56]    		@; Carrega a R8 el valor de R12 (guardat a [SP_irq + 56])
+			push {r8}             		@; Apila R12 a la pila del procés (SP_sys)
+			ldr r8, [r10, #12]    		@; Carrega a R8 el valor de R11 (guardat a [SP_irq + 12])
+			push {r8}             		@; Apila R11 a la pila del procés
+			ldr r8, [r10, #8]     		@; Carrega a R8 el valor de R10 (guardat a [SP_irq + 8])
+			push {r8}             		@; Apila R10 a la pila del procés
+			ldr r8, [r10, #4]     		@; Carrega a R8 el valor de R9 (guardat a [SP_irq + 4])
+			push {r8}					@; Apila R9 a la pila del procés
+			ldr r8, [r10, #0]     		@; Carrega a R8 el valor de R8 (guardat a [SP_irq + 0])
+			push {r8}             		@; Apila R8 a la pila del procés
+			ldr r8, [r10, #32]    		@; Carrega a R8 el valor de R7 (guardat a [SP_irq + 32])
+			push {r8}             		@; Apila R7 a la pila del procés
+			ldr r8, [r10, #28]    		@; Carrega a R8 el valor de R6 (guardat a [SP_irq + 28])
+			push {r8}             		@; Apila R6 a la pila del procés
+			ldr r8, [r10, #24]    		@; Carrega a R8 el valor de R5 (guardat a [SP_irq + 24])
+			push {r8}             		@; Apila R5 a la pila del procés
+			ldr r8, [r10, #20]    		@; Carrega a R8 el valor de R4 (guardat a [SP_irq + 20])
+			push {r8}             		@; Apila R4 a la pila del procés
+			ldr r8, [r10, #52]   		@; Carrega a R8 el valor de R3 (guardat a [SP_irq + 52])
+			push {r8}             		@; Apila R3 a la pila del procés
+			ldr r8, [r10, #48]    		@; Carrega a R8 el valor de R2 (guardat a [SP_irq + 48])
+			push {r8}             		@; Apila R2 a la pila del procés
+			ldr r8, [r10, #44]    		@; Carrega a R8 el valor de R1 (guardat a [SP_irq + 44])
+			push {r8}             		@; Apila R1 a la pila del procés
+			ldr r8, [r10, #40]    		@; Carrega a R8 el valor de R0 (guardat a [SP_irq + 40])
+			push {r8}             		@; Apila R0 a la pila del procés
+			
+			@; Guardem el valor de R13 (el Stack Pointer) al tercer camp del struct PCB.
+			str r13, [r9, #8]			
+			
+			@; Tornar al mode d'execudció IRQ.
+			mrs r8, CPSR				@; Carreguem el valor del CPSR (estat actual del processador).
+			and r8, r8, #0xFFFFFFE0		@; Reiniciem els 5 bits de menys pes a 0.
+			orr r8, r8, #0x12			@; Posem els 5 bits de menys pes en mode Normal Interrupt Request (10010b = 12h).
+			msr CPSR, r8				@; Guardem el CPSR per confirmar el canvi de mode.
 		
 	pop {r8-r11, pc}
 
@@ -211,6 +239,11 @@ _gp_salvarProc:
 	.global _gp_restaurarProc
 _gp_restaurarProc:
 	push {r8-r11, lr}
+		
+		@; Si nReady = 0, hem de restaurar el sistema operatiu (sòcol 0)
+		cmp r5, #0
+		beq .LrestaurarSO
+		
 		@; Carregar el número de sòcol del procés a restaurar.
 		ldr r8, =_gd_qReady			@; Carreguem la cua de processos en estat Ready.
 		ldrb r11, [r8]				@; Carreguem el número de sòcol del primer procés a la cua.
@@ -226,7 +259,12 @@ _gp_restaurarProc:
 			add r10, r10, #1		@; Incrementem comptador d'iteracions.
 			b .LreorderQueue
 		.LreorderEnd:
+		b .Lcontinuar				@; Saltem la casolística de nReady = 0.
 		
+		.LrestaurarSO:
+			mov r11, #0				@; Si nReady = 0, triem el sòcol 0
+		
+		.Lcontinuar:
 		@; Desar el PID i el número de sòcol del procés a restaurar dins de la variable global _gd_pidz
 		ldr r9, =_gd_pcbs			@; Carreguem l'adreça base del vector de PCBs dels processos.
 		mov r10, #24				@; Desem la dimensió de cadascun de les posicions del struct (6 ints * 4 bytes/int = 24).
@@ -288,6 +326,74 @@ _gp_restaurarProc:
 		orr r8, r8, #0x12			@; Posem els bits de mode d'execució en mode Normal Interrupt Request (10010b = 12h).
 		msr CPSR, r8				@; Guardem el CPSR amb el nou mode.
 	pop {r8-r11, pc}
+	
+	
+	.global _gp_actualizarDelay
+	@; Rutina para actualizar la cola de procesos retardados, poniendo en
+	@; cola de READY aquellos cuyo número de tics de retardo sea 0
+_gp_actualizarDelay:
+	push {r4-r10, lr}
+		ldr r4, =_gd_nDelay
+		ldr r5, [r4]				@; Carreguem el comptador de processos de la cua Delay
+		cmp r5, #0
+		beq .Lfi_update_delay		@; Si no hi ha cap procés a la cua, sortim
+		
+		ldr r6, =_gd_qDelay			@; Carreguem adreça de la cua
+		mov r7, #0					@; Inicialitzem un index i pel bucle
+		
+		.Lloop_chk_delay:
+			cmp r7, r5				@; Si i >= nDelay, hem acabat el bucle
+			bge .Lfi_update_delay
+			
+			@; Llegim el seguent element de qDelay
+			lsl r8, r7, #2			@; Offset pels 4 bytes per entrada (i * 4)
+			ldr r0, [r6, r8]		@; Carreguem el element actual
+			
+			sub r0, r0, #1			@; Decremenemtem el comptador de tics
+			
+			@; Comprovar si els tics han arribat a 0
+			ldr r1, =0xFFFF			@; Màscara pels 16 bits baixos (tics)
+			and r2, r0, r1			@; R2 = tics restants
+			cmp r2, #0
+			beq .Ldespertar_proces	@; Si els tics = 0, hem de despertar el procés
+			
+			str r0, [r6, r8]		@; Si encara li queden tics, actualitzem valor i passem al seguent procés
+			add r7, r7, #1
+			
+			.Ldespertar_proces:
+				lsr r9, r0, #16			@; Desplaçem per aillar el número de sòcol
+				
+				@; Afegir el procés a la cua de Ready
+				ldr r1, =_gd_nReady
+				ldr r2, [r1]			@; Carreguem el comptador de la cua de Ready
+				ldr r3, =_gd_qReady		@; Adreça de la cua de Ready
+				strb r9, [r3, r2]		@; Posem el sòcol a qReady[nReady]
+				add r2, r2, #1
+				str r2, [r1]			@; nReady++
+			
+			
+			@; Eliminar el procés de la cua Delay
+			add r10, r7, #1				@; Index (j) del procés a la dreta del procés a esborrar.	
+			.Lshift_del_loop:
+				cmp r10, r5
+				bge .Lfi_shift_del		@; Si hem arribat al final de la cua, sortim
+				
+				lsl r1, r10, #2			@; Calculem el offset de l'índex j (4 bytes per entrada)
+				ldr r2, [r6, r1]		@; Llegim qDelay[j]
+				sub r3, r1, #4			@; Offset j - 1
+				str r2, [r6, r3]		@; Guardem qDelay[j] a qDelay[j-1]
+				
+				add r10, r10, #1
+				b .Lshift_del_loop
+			
+			@; Actualitzar nDelay
+			.Lfi_shift_del:
+				sub r5, r5, #1			@; nDelay--
+				str r5, [r4]			@; Actualitzem variable global nDelay
+				b .Lloop_chk_delay		@; Saltem sense incrementar R7 (i) per compensar pel desplaçament cap a l'esquerra de la cua.
+		
+		.Lfi_update_delay:					
+	pop {r4-r10, pc}
 	
 	
 	.global _gp_numProc
@@ -515,7 +621,7 @@ _gp_matarProc:
 		.Lfi_delay:
 			bl _gp_desinhibirIRQs		@; Fi secció crítica
 			
-			ldr r1, _gd_pidz
+			ldr r1, =_gd_pidz
 			ldr r1, [r1]
 			and r1, r1, #0xF			@; Filtrem els 4 bits de sòcol
 			cmp r1, r0					
@@ -571,6 +677,12 @@ _gp_retardarProc:
 		str r1, [r0]
 		
 		bl _gp_desinhibirIRQs		@; Finalitzem la secció crítica
+		
+		@; Posem el bit de més pes del PIDZ a 1
+		ldr r0, =_gd_pidz
+		ldr r1, [r0]
+		orr r1, r1, #0x80000000 @; Posem el bit 31 a 1
+		str r1, [r0]
 		
 		.Lwait_only:
 			bl _gp_WaitForVBlank	@; Cedim la CPU
@@ -643,7 +755,7 @@ _gp_rsiTIMER0:
 		blt .Lfi_timer					@; Si encara no sumem 100 tics totals, sortim
 		
 		@; Actualitzem porcentatges i reinciem comptadors
-		ldr r4 = _gd_pcbs
+		ldr r4, =_gd_pcbs
 		mov r6, #0						@; Reiniciem el comptador del bucle
 		
 		.Lloop_calc:
@@ -658,6 +770,12 @@ _gp_rsiTIMER0:
 			add r6, r6, #1				@; Incrementem index del bucle
 			cmp r6, #16					
 			blt .Lloop_calc				@; Comprovem que el index sigui < 16, sino acabem bucle
+			
+			
+		ldr r4, =_gd_sincMain
+		ldr r5, [r4]					
+		orr r5, r5, #1			
+		str r5, [r4]					@; Posem a 1 el bit 0 de sincMain
 		
 		.Lfi_timer:
 	pop {r0-r6, pc}
@@ -672,23 +790,25 @@ _gp_rsiTIMER0:
 	@; Resultat:
 	@; R0: 1 si s'ha enviat amb èxit, 0 si hi ha hagut un error (bústia plena o ID invàlid)
 _ga_send:
-	push {r4-r7, lr}
+	push {r4-r8, lr}
 		@; Validem n (ID de la bústia)
 		cmp r0, #8
-		bhs .Lsend_error				@; Saltem a retornar error si el ID de la bústia >= 8.
+		bhs .Lsend_fail_idx				@; Saltem a retornar error si el ID de la bústia >= 8.
 		
 		@; Calculem l'adreça de la bústia per enviar la dada.
 		ldr r4, =_gd_mailboxes			@; Carreguem l'adreça base dels vectors de les bústies.
 		mov r5, #MAILBOX_STRUCT_SIZE	@; Carreguem el tamany de cada posició del vector de bústies.
 		mla r4, r0, r5, r4				@; Calculem l'adreça de la bústia n (n * Tamany de cada posició + Adreça base vectors)
 		
+		bl _gp_inhibirIRQs				@; Iniciem la secció crítica
+		
 		@; Llegim el comptador de dades (count) de la bústia per comprovar que no estigui plena.
-		ldr r5, [r4, #72]				@; Carreguem el offset 72 (count) de la bústia.
+		ldr r5, [r4, #MB_COUNT]			@; Carreguem el offset 72 (count) de la bústia.
 		cmp r5, #MAILBOX_QUEUE_SIZE		@; Comparem el comptador amb el nombre màxim de dades.
-		bhs .Lsend_error				@; Si el comptador >= 16, la bústia està plena, per tant tirem error.
+		bhs .Lsend_full					@; Si el comptador >= 16, la bústia està plena, per tant tirem error.
 		
 		@; Afegim la dada a la cua.
-		ldr r6, [r4, #68]				@; Carreguem a R6 el índex del final de la cua (tail).
+		ldr r6, [r4, #MB_TAIL]			@; Carreguem a R6 el índex del final de la cua (tail).
 		add r7, r4, r6, lsl #2			@; Calculem l'adreça del índex tail (Adreça del inici de la bústia + (índex tail * 4).
 		str r1, [r7]					@; Guardem la dada en la posició.
 		
@@ -696,21 +816,58 @@ _ga_send:
 		add r6, r6, #1					@; Incrementem índex tail
 		cmp r6, #MAILBOX_QUEUE_SIZE		@; Mirem si el índex tail és igual a 16.
 		moveq r6, #0					@; Si tail == 16, posem tail = 0 (Round Robin)
-		str r6, [r4, #68]				@; Tornem a guardar el índex tail en el vector de la bústia.
+		str r6, [r4, #MB_TAIL]			@; Tornem a guardar el índex tail en el vector de la bústia.
 		
 		@; Incrementem variable comptador de dades
 		add r5, r5, #1					@; Incrementem el comptador.
-		str r5, [r4, #72]				@; Guardem la variable comptador en el vector de la bústia.
+		str r5, [r4, #MB_COUNT]			@; Guardem la variable comptador en el vector de la bústia.
 		
-		@; Retornem codi d'èxit per R0
-		mov r0, #1						@; Codi èxit.
-		b .Lsend_end					@; Saltem al final de la funció
+		@; Gestió de desbloqueig
+		ldr r8, [r4, #MB_NWAIT]
+		cmp r8, #0
+		beq .Lsend_ok					@; Ningú està esperant per tant sortim
 		
-		.Lsend_error:
-			mov r0, #0					@; Codi d'error.
+		add r6, r4, #MB_WAIT			@; Punter al array pWaiting
+		ldrb r7, [r6]					@; R7 = PID del procés que està esperant
 		
+		mov r2, #0						@; Index i pel bucle de desplaçament
+		@; Esborrem el procés de la cua pWaiting
+		.Lshift_wait_loop:
+			add r3, r2, #1				@; Index j = i + 1
+			cmp r3, r8
+			bge .Lshift_wait_end		@; Si j >= nWaiting, hem acabat de desplaçar
+			ldrb r1, [r6, r3]			@; Carreguem pWaiting[j]
+			strb r1, [r6, r2]			@; Guardem a pWaiting[i]
+			add r2, r2, #1				@; Incrementem index i
+			b .Lshift_wait_loop
+		.Lshift_wait_end:
+		
+		sub r8, r8, #1				@; Decrementem comptador nWaiting
+		str r8, [r4, #MB_NWAIT]		@; Actualitzem variable global
+		
+		@; Posem el procés a la cua de Ready
+		ldr r2, =_gd_nReady
+		ldr r3, [r2]				@; Comptador de processos a la cua de Ready
+		ldr r1, =_gd_qReady
+		strb r7, [r1, r3]			@; qReady[nReady] = Procés despertat
+		
+		add r3, r3, #1				@; nReady++
+		str r3, [r2]				@; Actualitzem variable global
+			
+		.Lsend_ok:
+			bl _gp_desinhibirIRQs	@; Tanquem secció crítica
+			mov r0, #1				@; Codi 1 (OK)
+			b .Lsend_end
+			
+		.Lsend_full:
+			bl _gp_desinhibirIRQs	@; Tanquem secció crítica
+			mov r0, #0				@; Codi 0 (Bústia plena)
+		
+		.Lsend_fail_idx:
+			mov r0, #0				@; Codi 0 (Index invàlid)
+			
 		.Lsend_end:
-	pop {r4-r7, pc}
+	pop {r4-r8, pc}
 	
 	
 	.global _ga_receive
@@ -722,43 +879,89 @@ _ga_send:
 	@; Retorna:
 	@; R0: la dada rebuda de la bústia
 _ga_receive:
-	push {r4-r7, lr}
-		@; Calculem l'adreça de la bústia
-		ldr r4, =_gd_mailboxes			@; Carreguem l'adreça base dels vectors de les bústies.
-		mov r5, #MAILBOX_STRUCT_SIZE	@; Carreguem el tamany de cada posició del vector de bústies.
-		mla r4, r0, r5, r4				@; Calculem l'adreça de la bústia n (n * Tamany de cada posició + Adreça base vectors).
+	push {r4-r8, lr}
+		mov r8, r0						@; Guardem ID de bústia
 		
-		@; Bucle de consulta del estat de la bústia
-		.Lreceive_loop:
-			@; Comprovar si està buida la bústia
-			ldr r5, [r4, #72]			@; Carreguem la variable comptador de dades (count).
-			cmp r5, #0					@; Mirem si el comptador == 0.
-			beq .Lreceive_wait			@; Saltar al bucle d'espera (per bloquejar) si count == 0 (bústia buida).
+		.Lretry_receive:
+			@; Calculem adreça de la bústia
+			ldr r4, =_gd_mailboxes
+			mov r5, #MAILBOX_STRUCT_SIZE
+			mla r4, r8, r5, r4			@; R4 = Punter a la bústia (Adreça + (desplaçament * ID))
 			
-			@; Treiem la dada de la cua
-			ldr r6, [r4, #64]			@; Carreguem la variable del principi de la cua (head).
-			add r7, r4, r6, lsl #2		@; Calculem l'adreça de la posició head (Adreça base de la bústia + (índex head * 4).
-			ldr r0, [r7]				@; Carreguem a R0 la dada per retornar-la.
+			bl _gp_inhibirIRQs			@; Obrim secció crítica
 			
-			@; Actualitzem índex head (head++)
-			add r6, r6, #1				@; Incrementem índex head.
-			cmp r6, #MAILBOX_QUEUE_SIZE	@; Mirem si el índex head és igual a 16
-			moveq r6, #0				@; Si head == 16, posem head = 0 (Round Robin)
-			str r6, [r4, #64]			@; Guardem el valor actualitzat del head.
+			@; Comprovem si hi han dades
+			ldr r5, [r4, #MB_COUNT]
+			cmp r5, #0					
+			beq .Lreceive_block			@; Si el comptador de dades = 0, la bústia està buida, bloquejem
 			
-			@; Decrementar count
-			sub r5, r5, #1				@; Fem count--
-			str r5, [r4, #72]			@; Guardar el nou valor del count.
+			@; Llegim la dada
+			ldr r6, [r4, #MB_HEAD]
+			add r7, r4, r6, lsl #2		@; Adreça = Base + (HEAD * 4)
+			ldr r0, [r7]				@; Carreguem la dada
 			
-			b .Lreceive_end				@; Hem rebut la dada, sortir
+			@; Actualitzar head i count
+			add r6, r6, #1
+			cmp r6, #MAILBOX_QUEUE_SIZE
+			moveq r6, #0				@; Round Robin
 			
-		@; La bústia està buida, esperar al següent VBlank (bloquejar el procés).	
-		.Lreceive_wait:
-			bl _gp_WaitForVBlank		@; Cedim CPU i esperar un 'tic'
-			b .Lreceive_loop			@; Tornem a comprovar si la bústia és buida.
+			sub r5, r5, #1
+			str r5, [r4, #MB_COUNT]		@; Actualitzem comptador de dades de la bústia
 			
+			bl _gp_desinhibirIRQs
+			b .Lreceive_end
+			
+			@; -------------------------------BLOQUEIG DEL PROCÉS-----------------------------------------
+			.Lreceive_block:
+			
+			@; Obtenir el sòcol
+			ldr r1, =_gd_pidz
+			ldr r1, [r1]
+			and r1, r1, #0xF			@; Filtrem el sòcol
+
+			@; Afegir-me a la cua d'espera de la bústia (pWaiting)
+			ldr r2, [r4, #MB_NWAIT]		@; nWaiting
+			add r3, r4, #MB_WAIT		@; Adreça base pWaiting
+			strb r1, [r3, r2]			@; Guardem el sòcol a pWaiting[nWaiting]
+			add r2, r2, #1				
+			str r2, [r4, #MB_NWAIT]		@; nWaiting++
+
+			@; Eliminar-me de la cua READY
+			ldr r2, =_gd_nReady
+			ldr r3, [r2]				@; nReady
+			ldr r6, =_gd_qReady			@; Adreça base cua de Ready
+			mov r5, #0					@; Index i pel bucle
+
+			.Lsearch_ready:
+				cmp r5, r3
+				bge .Lblock_wait			@; Mirem si hem acabat la cerca
+				ldrb r7, [r6, r5]			@; Llegim qReady[i]
+				cmp r7, r1					@; Comprovem si coioncideix el número de sòcol
+				beq .Lfound_ready			
+				add r5, r5, #1
+				b .Lsearch_ready
+
+		.Lfound_ready:
+			add r7, r5, #1				@; Agafem el procés a la dreta (j = i + 1) 
+		.Lshift_ready_loop:
+			cmp r7, r3					@; Mirem si hem  acabat el bucle de desplaçament
+			bge .Lfi_shift_ready_loop
+			ldrb r12, [r6, r7]			@; qReady[j]
+			sub r5, r7, #1
+			strb r12, [r6, r5]			@; qReady[j-1] = qReady[j]
+			add r7, r7, #1
+			b .Lshift_ready_loop
+		.Lfi_shift_ready_loop:
+			sub r3, r3, #1				@; nReady--
+			str r3, [r2]
+
+		.Lblock_wait:
+			bl _gp_desinhibirIRQs		@; Tanquem secció crítica
+			bl _gp_WaitForVBlank		@; Cedim CPU
+			b .Lretry_receive			@; Si algú ens desperta, tornem a mirar a veure si hi han dads
+
 		.Lreceive_end:
-	pop {r4-r7, pc}
+	pop {r4-r8, pc}
 			
 
 	
