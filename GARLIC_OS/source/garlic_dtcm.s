@@ -52,17 +52,23 @@ _gd_sprites: .space 128 * 8     									@; Vector de sprites
 
 @; -- Variables per la funcionalitat addicional (bústies) --
 
-MAILBOX_QUEUE_SIZE = 16												@; Número de posicions de cadascuna de les bústies.
+MAILBOX_QUEUE_SIZE = 16
 
 @; Estructura de cada bústia
-@; Offset 0: Inici array per la cua (MAILBOX_QUEUE_SIZE * 4 bytes)
-@; Offset 64: Posició inici/cap de la cua (head index, int)
-@; Offset 68: Posició final/cua de la cua (tail index, int)
-@; Offset 72: Comptador de dades (count, int)
-MAILBOX_STRUCT_SIZE = (MAILBOX_QUEUE_SIZE * 4) + 4 + 4 + 4			@; Variable del tamany del struct de cada bústia (64 + 4 + 4 + 4 = 76 bytes).
+@; Offset 0:  Buffer circular de dades (16 ints * 4 = 64 bytes)
+@; Offset 64: Head index (4 bytes)
+@; Offset 68: Tail index (4 bytes)
+@; Offset 72: Count (4 bytes)
+@; Offset 76: Cua de processos esperant (pWaiting) -> 16 bytes (1 byte per PID)
+@; Offset 92: Comptador de processos esperant (nWaiting) -> 4 bytes
+@; -------------------------------------------------------------
+@; TOTAL: 64 + 4 + 4 + 4 + 16 + 4 = 96 bytes
+
+MAILBOX_STRUCT_SIZE = 96
 
 	.global _gd_mailboxes
-_gd_mailboxes: .space 8 * MAILBOX_STRUCT_SIZE						@; Vector per les 8 bústies.
+_gd_mailboxes:
+	.space 8 * MAILBOX_STRUCT_SIZE		@; Reserva espai per a 8 bústies (768 bytes)
 
 .end
 

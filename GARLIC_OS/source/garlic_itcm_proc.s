@@ -95,13 +95,28 @@ _gp_IntrMain:
 _gp_rsiVBL:
 	push {r4-r7, lr}
 		
+		@; FASE 2: Comptar Tics del Procés Actual
+		ldr r4, =_gd_pidz
+		ldr r4, [r4]
+		and r4, r4, #0xF			@; R4 = Sòcol actual
+		
+		ldr r5, =_gd_pcbs
+		mov r6, #PCB_SIZE					@; Mida PCB
+		mla r5, r6, r4, r5			@; R5 = Adreça PCB actual
+		
+		ldr r6, [r5, #PCB_TICKS]	@; Carreguem workTicks (offset 20)
+		add r6, r6, #1				@; Incrementem
+		str r6, [r5, #PCB_TICKS]	@; Guardem
+	
 		@; Incrementar comptador tics.
 		ldr r4, =_gd_tickCount		@; Carreguem l'adreça de la variable comptador de tics global.
 		ldr r5, [r4] 				@; Carreguem el valor de la variable comptador de tics.
 		add r5, #1					@; Incrementem el valor de la variable.
 		str r5, [r4]				@; Guardem el valor modificat.
 		
+		
 		bl _gp_actualizarDelay		@; FASE 2: Cridem a la funció que actualitza la cua de Delay i desperta els processos si fa falta.
+		
 		
 		@; Comprovar si hi ha algun procés a la cua nReady.
 		
@@ -332,7 +347,7 @@ _gp_restaurarProc:
 	@; Rutina para actualizar la cola de procesos retardados, poniendo en
 	@; cola de READY aquellos cuyo número de tics de retardo sea 0
 _gp_actualizarDelay:
-	push {r4-r10, lr}
+	push {r0-r10, lr}
 		ldr r4, =_gd_nDelay
 		ldr r5, [r4]				@; Carreguem el comptador de processos de la cua Delay
 		cmp r5, #0
@@ -358,7 +373,8 @@ _gp_actualizarDelay:
 			beq .Ldespertar_proces	@; Si els tics = 0, hem de despertar el procés
 			
 			str r0, [r6, r8]		@; Si encara li queden tics, actualitzem valor i passem al seguent procés
-			add r7, r7, #1
+			add r7, r7, #1			@; Incrementem index i
+			b .Lloop_chk_delay
 			
 			.Ldespertar_proces:
 				lsr r9, r0, #16			@; Desplaçem per aillar el número de sòcol
@@ -393,7 +409,7 @@ _gp_actualizarDelay:
 				b .Lloop_chk_delay		@; Saltem sense incrementar R7 (i) per compensar pel desplaçament cap a l'esquerra de la cua.
 		
 		.Lfi_update_delay:					
-	pop {r4-r10, pc}
+	pop {r0-r10, pc}
 	
 	
 	.global _gp_numProc
@@ -452,6 +468,7 @@ _gp_crearProc:
 		ldr r4, =_gd_stacks			@; Adreça del vector de piles dels processos.
 		mov r5, #512				@; Dimensió de cada pila (128 registres * 4 bytes/registre).
 		mla r7, r5, r1, r4			@; Calculem l'adreça de la pila del procés (Sòcol * Dimensió pila + Adreça base vector piles)
+		add r7, r7, r5				@; Ens coloquem al TOP de la pila
 		
 		@; Col·locar la funció terminarProc al principi de la pila del procés (a la posició LR)
 		ldr r4, =_gp_terminarProc	@; Carreguem l'adreça de la funció per finalitzar un procés usuari.
@@ -676,13 +693,13 @@ _gp_retardarProc:
 		add r1, r1, #1
 		str r1, [r0]
 		
-		bl _gp_desinhibirIRQs		@; Finalitzem la secció crítica
-		
 		@; Posem el bit de més pes del PIDZ a 1
 		ldr r0, =_gd_pidz
 		ldr r1, [r0]
 		orr r1, r1, #0x80000000 @; Posem el bit 31 a 1
 		str r1, [r0]
+		
+		bl _gp_desinhibirIRQs		@; Finalitzem la secció crítica
 		
 		.Lwait_only:
 			bl _gp_WaitForVBlank	@; Cedim la CPU
@@ -721,19 +738,6 @@ _gp_desinhibirIRQs:
 	@; columna correspondiente de la tabla de procesos.
 _gp_rsiTIMER0:
 	push {r0-r6, lr}
-		@; Incrementem el comptador de ticks del procés actual
-		ldr r0, = _gd_pidz
-		ldr r0, [r0]
-		and r0, r0, #0xF				@; Carreguem el número de sòcol actual (4 bits baixos del PIDZ)
-		
-		ldr r1, =_gd_pcbs				@; Adreça del vector de PCBs
-		mov r2, #PCB_SIZE				@; Tamany de cada PCB
-		mul r2, r0, r2					@; Calculem desplaçament (núm. sòcol * tamany PCB)
-		add r1, r1, r2					@; Adreça base + desplaçament = Punter al PCB del procés actual
-		
-		ldr r3, [r1, #PCB_TICKS]		@; Carreguem la variable workTicks del PCB
-		add r3, r3, #1					@; Incrementem el comptador de tics
-		str r3, [r1, #PCB_TICKS]		@; Guardem el valor actualitzat
 		
 		@; Calculem el valor total de tics de tots els processos
 		ldr r4, =_gd_pcbs				@; Adreça del vector de PCBs
@@ -751,7 +755,7 @@ _gp_rsiTIMER0:
 			cmp r6, #16
 			blt .Lloop_suma				@; Mirem si hem acabat el bucle
 			
-		cmp r5, #100
+		cmp r5, #50
 		blt .Lfi_timer					@; Si encara no sumem 100 tics totals, sortim
 		
 		@; Actualitzem porcentatges i reinciem comptadors
@@ -926,34 +930,11 @@ _ga_receive:
 			add r2, r2, #1				
 			str r2, [r4, #MB_NWAIT]		@; nWaiting++
 
-			@; Eliminar-me de la cua READY
-			ldr r2, =_gd_nReady
-			ldr r3, [r2]				@; nReady
-			ldr r6, =_gd_qReady			@; Adreça base cua de Ready
-			mov r5, #0					@; Index i pel bucle
-
-			.Lsearch_ready:
-				cmp r5, r3
-				bge .Lblock_wait			@; Mirem si hem acabat la cerca
-				ldrb r7, [r6, r5]			@; Llegim qReady[i]
-				cmp r7, r1					@; Comprovem si coioncideix el número de sòcol
-				beq .Lfound_ready			
-				add r5, r5, #1
-				b .Lsearch_ready
-
-		.Lfound_ready:
-			add r7, r5, #1				@; Agafem el procés a la dreta (j = i + 1) 
-		.Lshift_ready_loop:
-			cmp r7, r3					@; Mirem si hem  acabat el bucle de desplaçament
-			bge .Lfi_shift_ready_loop
-			ldrb r12, [r6, r7]			@; qReady[j]
-			sub r5, r7, #1
-			strb r12, [r6, r5]			@; qReady[j-1] = qReady[j]
-			add r7, r7, #1
-			b .Lshift_ready_loop
-		.Lfi_shift_ready_loop:
-			sub r3, r3, #1				@; nReady--
-			str r3, [r2]
+			@; Eliminar-me de la cua READY posant el bit 31 del PIDZ a 1
+			ldr r0, =_gd_pidz			@; Carreguem adreça de pidz (línia nova)
+			ldr r1, [r0]				@; Llegim el valor actual (línia nova)
+			orr r1, r1, #0x80000000		@; Activem Bit 31 per indicar bloqueig (línia nova)
+			str r1, [r0]				@; Guardem el canvi (línia nova)
 
 		.Lblock_wait:
 			bl _gp_desinhibirIRQs		@; Tanquem secció crítica
