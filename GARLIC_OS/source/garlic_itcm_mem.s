@@ -242,10 +242,87 @@ _gm_liberarMem:
 	@; Rutina de Servicio de Interrupci�n (RSI) para actualizar la representa-
 	@; ci�n de la pila y el estado de los procesos activos.
 _gm_rsiTIMER1:
-	push {lr}
-
-
-	pop {pc}
+	push {r0-r10, lr}
+	bl _gs_representarPilas		@;pintar columna Pi
 	
+	mov r4, #0					@;index pel numero de zocalo 
+.Lloop_state:
+	cmp r4, #16
+	bge .Lrsi_end
+	
+	ldr r5, =_gd_pcbs			@; vector procs. actius
+	@;calcular offset = index zocal * 24 (mida pcb -> 16 zocalos, 6 camps, 4B cada camp)
+	mov r0, #24
+	mla r5, r4, r0, r5			@;PCB zocalo-i (z*24 + base)
+	ldr r6, [r5]				@;PID
+	
+	@;PROBLEMA: al començar en 0 es borrara i mai escriura res
+	@;al proc de control (zocalo 0)
+	cmp r4, #0
+	beq .Lexcepcio_zocalo
+	cmp r6, #0
+	beq .Lborrar_state
+	
+.Lexcepcio_zocalo:
+	@;busqueda valor estat
+	ldr r7, =_gd_pidz			@;PID+zocalo
+	ldr r7, [r7]
+	and r7, r7, #0xF			@;mascara para numero de zocalo (2^4 = 16 ventanas)
+	cmp r7, r4
+	beq .Lstate_R
+	
+	ldr r8, =_gd_nDelay			@;num procs. en blocked
+	cmp r8, #0
+	beq .Lstate_Y				@;si no hay, proceso es ready
+	
+	ldr r9, =_gd_qDelay			@;cua procs. retardats
+	mov r10, #0					@;index cua
+
+.Lbusqueda_delay:
+	ldr r0, [r9, r10, lsl #2]	@;word 32 bits
+	mov r0, r0, lsr #24
+	cmp r0, r4
+	beq .Lstate_B
+	add r10, #1
+	cmp r10, r8
+	blt .Lbusqueda_delay
+	
+.Lstate_Y:
+	ldr r0, =.Lstr_Y
+	mov r3, #0					@;color blanc (0)
+	b .Lescriure_lletra
+	
+.Lstate_B:
+	ldr r0, =.Lstr_B
+	mov r3, #0
+	b .Lescriure_lletra
+ 
+.Lstate_R:
+	ldr r0, =.Lstr_R
+	mov r3, #3					@;color blau (3)
+	b .Lescriure_lletra
+
+.Lborrar_state:
+	ldr r0, =.Lstr_Empty
+	mov r3, #0
+	
+.Lescriure_lletra:
+	@;_gs_escribirStringSub(char *s, int fil, int col, int color)
+	add r1, r4, #4				@;primera fila = 4
+	mov r2, #26					@; columna E = 26
+	bl _gs_escribirStringSub
+	
+	add r4, #1
+	b .Lloop_state
+	
+.Lrsi_end:
+	pop {r0-r10, pc}
+	
+.section .rodata
+	.align 2
+	.Lstr_R:     .asciz "R"
+	.Lstr_Y:     .asciz "Y"
+	.Lstr_B:     .asciz "B"
+	.Lstr_Empty: .asciz " "
 .end
 
