@@ -151,6 +151,7 @@ intFunc _gm_cargarPrograma(int zocalo, char *keyName)
         unsigned char tipo = (progHeader[i].p_flags & PF_W) ? 1 : 0; // 0: Code (RE), 1: Data (RW)
         unsigned int *memDest = _gm_reservarMem(zocalo, progHeader[i].p_memsz, tipo); 
         
+		//0, NULL y false es tracten igual en punters
         if (memDest == NULL) {
             _gm_liberarMem(zocalo);
             free(fitBuffer);

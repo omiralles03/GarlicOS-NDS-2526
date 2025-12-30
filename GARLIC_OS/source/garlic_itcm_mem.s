@@ -183,6 +183,7 @@ _gm_reservarMem:
 	pop {r0-r3}
 	
 	@;calculo dir. retorno = INI_MEM_PROC + (index_ini * 32)
+	@; asegurant adreçes multiples de 4 per cada segment 
 	ldr r0, =INI_MEM_PROC
 	add r0, r0, r9, lsl #5
 	pop {r4-r9, pc}
@@ -201,10 +202,39 @@ _gm_reservarMem:
 	@;Par�metros
 	@;	R0: el n�mero de z�calo que libera la memoria
 _gm_liberarMem:
-	push {lr}
+	push {r4-r8, lr}
+	mov r4, r0
+	ldr r5, =_gm_zocMem
+	mov r6, #0					@;index
 
-
-	pop {pc}
+.Lfree_loop:
+	cmp r6, #NUM_FRANJAS
+	bge .Lfree_end
+	
+	ldrb r7, [r5, r6]
+	cmp r7, r4					@;_gm_zocMem[i] pertany a zocalo?
+	bne .Lfree_next
+	@;sino, lliberar franja
+	mov r8, #0
+	strb r8, [r5, r6]
+	
+	@;pintar pantalla inferior
+	@;_gs_pintarFranjas(zocalo, index_ini, num_franjas, tipo_seg)
+	push {r0-r3}
+	mov r0, #0					@;0 per borrar
+	mov r1, r6
+	mov r2, #1					@;vaig pintant segons trobo caselles
+	mov r3, #0					@;indiferent
+	bl _gs_pintarFranjas
+	pop {r0-r3}
+	
+	
+.Lfree_next:
+	add r6, #1
+	b .Lfree_loop
+	
+.Lfree_end:
+	pop {r4-r8, pc}
 
 
 
