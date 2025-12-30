@@ -91,7 +91,29 @@ int _gm_initFS()
 			el n?mero de programas detectados */
 int _gm_listaProgs(char* progs[])
 {
-
+	int num_progs = 0;
+	DIR *directori;
+	struct dirent *ent;
+	
+	directori = opendir("/Programas/");
+	if (directori == NULL) return 0;
+	
+	while((ent = readdir(directori)) != NULL){
+		int length = strlen(ent->d_name);
+		
+		//8 de longitud xq 4 del nom clau i 4 de l'extensió ".elf"
+		if(length == 8 && strcmp(&ent->d_name[4], ".elf") == 0){
+			progs[num_progs] = malloc(5);	//5 bytes -> 4 nom i 1 del \0
+			if(progs[num_progs] != NULL){
+				strncpy(progs[num_progs], ent->d_name, 4);
+				progs[num_progs][4] = '\0';	//escriure fi cadena
+				num_progs++;
+			}
+		}
+	}
+	
+	closedir(directori);
+	return num_progs;
 }
 
 /* _gm_cargarPrograma: busca un fichero de nombre "(keyName).elf" dentro del
