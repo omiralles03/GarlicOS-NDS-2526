@@ -299,7 +299,7 @@ _gm_rsiTIMER1:
  
 .Lstate_R:
 	ldr r0, =.Lstr_R
-	mov r3, #3					@;color blau (3)
+	mov r3, #1					@;color blau (1)
 	b .Lescriure_lletra
 
 .Lborrar_state:
@@ -324,5 +324,25 @@ _gm_rsiTIMER1:
 	.Lstr_Y:     .asciz "Y"
 	.Lstr_B:     .asciz "B"
 	.Lstr_Empty: .asciz " "
+	
+	
+	.global _gm_pintarFranjas
+	
+	@; Rutina adicional del progM permet distingir les franges
+	@; dels processos d'usuari que estan ocupades per memoria dinamica
+	@; mitjançant les funcions _gm_do_malloc per reservar 
+	@; & _gm_do_free per lliberar, ambdues tambe modificades.
+	@; Parametres:
+	@; r0 = zocalo
+	@; r1 = index_ini
+	@; r2 = n_franjes
+	@; r3 = tipus franja - 0: franja normal; 1: franja invertida
+	
+	@;_gs_pintarFranjas(zocalo, index_ini, num_franjas, tipo_seg)
+	@;96 -> gris en _gs_pintarFranja -> _gs_colZoc
+_gm_pintarFranjas:
+	@;push { , lr}
+	@;pop { , pc}
+	
 .end
 

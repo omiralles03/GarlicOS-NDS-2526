@@ -33,10 +33,17 @@ unsigned int ini_prog = INI_MEM;	// dirección inicial para nuevo programa (afegi
 unsigned int dMem_lliure = INI_MEM;	//pos. mem. lliure dinàmicament ( suposem total segments < 24KB)
 										//inicialment valor carrega primer seg.
 
+//---------------------------------------------------
+//			Variables per func. addicionals
+//						  progM
+//---------------------------------------------------
 //Array per guardar punters reservats per cada proces
 void *blocs_reservats[16][4] = { {NULL} };
 //Comptador de blocs reservats per a cada proces
 int num_blocs_reservats[16] = {0};
+//Comptador franges de _gm_zocMem ocupades per proces
+int franjes_reservades[16];
+
 
 //tipus de variables en .elf 
 typedef uint32_t Elf32_Addr;   // 4 bytes (direcció de mem.)
@@ -211,23 +218,42 @@ void *_gm_do_malloc(unsigned int size, int zocalo) {
     if (zocalo < 0 || zocalo > 15 || num_blocs_reservats[zocalo] >= 4) {
         return NULL; //límit superat o zócalo invàlid
     }
-
-    void *ptr = malloc(size);
-    if (ptr == NULL) {
-        return NULL;
-    }
-
-    //marcar punter guardat
-    for (int i = 0; i < 4; i++) {
-        if (blocs_reservats[zocalo][i] == NULL) {
-            blocs_reservats[zocalo][i] = ptr;
-            num_blocs_reservats[zocalo]++;
-            return ptr; // Retornem el punter reservat
+	
+	//calcul numero franges (round-up)
+	int n_franges = (size + 31) / 32;
+	int inici = -1;
+	int comptador = 0;
+	
+	//buscar lloc a _gm_zocMem
+	for(int i = 0; i < 768; i++){
+		if (_gm_zocMem[i] == 0) {
+            if (comptador == 0) inici = i;
+            comptador++;
+            if (comptador == n_franges) break;
+        } else {
+            comptador = 0;
         }
-    }
+	}
+	
+	if (comptador < n_franges) return NULL;	//si no hi ha espai
+	
+	for (int i = inici; i < inici + n_franges; i++) _gm_zocMem[i] = zocalo;
+	
+	int num = num_blocs_reservats[zocalo];
+	void *ptr = (void *)(0x01002000 + (inici * 32));
+	blocs_reservats[zocalo][num] = ptr;
+	franges_reservades[zocalo][num] = n_franges;
+	num_blocs_reservats[zocalo]++;
+
+	_gm_pintarFranjas(zocalo, inici, 1, 1);	//primera franja -> tipus 1
+	
+	//altres
+	if (n_franges > 1){
+		_gm_pintarFranjas(zocalo, inici + 1, n_franges - 1, 0);
+	}
+	
 	//per si de cas
-    free(ptr);
-    return NULL;
+    return ptr;
 }
 
 int _gm_do_free(void *ptr, int zocalo) {
