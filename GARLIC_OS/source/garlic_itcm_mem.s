@@ -333,16 +333,17 @@ _gm_rsiTIMER1:
 	@; mitjançant les funcions _gm_do_malloc per reservar 
 	@; & _gm_do_free per lliberar, ambdues tambe modificades.
 	@; Parametres:
-	@; r0 = zocalo
+	@; r0 = zocalo - 0 borrar/blanc
 	@; r1 = index_ini
-	@; r2 = n_franjes
+	@; r2 = n_franjes (per pintar)
 	@; r3 = tipus franja - 0: franja normal; 1: franja invertida
 	
 	@;_gs_pintarFranjas(zocalo, index_ini, num_franjas, tipo_seg)
 	@;96 -> gris en _gs_pintarFranja -> _gs_colZoc
 _gm_pintarFranjas:
-	@;push { , lr}
-	@;pop { , pc}
+	push {r4-r11, lr}
+	
+	pop {r4-r11, pc}
 	
 .end
 

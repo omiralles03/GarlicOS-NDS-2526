@@ -362,5 +362,9 @@ typedef struct
 // Vector global per a les 8 bústies
 extern garlicMailbox _gd_mailboxes[8];
 
+//------------------------------------------------------------------------------
+//	FUNCIONS ADDICIONALS ProgM
+//------------------------------------------------------------------------------
+extern unsigned char _gm_zocMem[768];
 
 #endif // _GARLIC_SYSTEM_h

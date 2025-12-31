@@ -42,7 +42,7 @@ void *blocs_reservats[16][4] = { {NULL} };
 //Comptador de blocs reservats per a cada proces
 int num_blocs_reservats[16] = {0};
 //Comptador franges de _gm_zocMem ocupades per proces
-int franjes_reservades[16];
+int franges_reservades[16][4];
 
 
 //tipus de variables en .elf 
@@ -257,19 +257,22 @@ void *_gm_do_malloc(unsigned int size, int zocalo) {
 }
 
 int _gm_do_free(void *ptr, int zocalo) {
-    if (zocalo < 0 || zocalo > 15 || ptr == NULL) {
-        return 0;
-    }
-
-    //buscar punter per "eliminar-lo"
     for (int i = 0; i < 4; i++) {
         if (blocs_reservats[zocalo][i] == ptr) {
-            free(ptr);
+            int inici = ((unsigned int)ptr - 0x01002000) / 32;
+            int n_franges = franges_reservades[zocalo][i];
+
+            //alliberar franges al vector
+            for (int j = inici; j < inici + n_franges; j++) _gm_zocMem[j] = 0;
+
+            // esborrar pintura sub-screen
+            _gm_pintarFranjas(0, inici, n_franges, 0);
+
+            //update variables control
             blocs_reservats[zocalo][i] = NULL;
             num_blocs_reservats[zocalo]--;
-            return 1; // retorn positiu
+            return 1;
         }
     }
-
     return 0; // retorn error: el punter no pertanyia a aquest procés
 }
