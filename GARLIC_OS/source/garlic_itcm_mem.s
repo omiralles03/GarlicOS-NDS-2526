@@ -343,6 +343,75 @@ _gm_rsiTIMER1:
 _gm_pintarFranjas:
 	push {r4-r11, lr}
 	
+	ldr r5, =_gs_colZoc
+    ldrb r8, [r5, r0]           @; R8 = color paleta correspondiente al z�calo
+    mov r9, #1                  @; R9 = color gris (G)
+	
+	cmp r0, #0					@;si zocalo = 0 -> borrar, colors = 0
+    moveq r8, #0
+    moveq r9, #0
+	
+	@;calcul direcció en VRAM
+	and r4, r1, #7				@; R4 = �nidice franja inicial m�dulo 8
+	mov r1, r1, lsr #3			@; R1 = �ndice inicial dividido por 8
+	add r1, #512				@; saltar 512 baldosas (caracteres)
+	mov r1, r1, lsl #6			@; multiplicar todo por 64 bytes por baldosa
+	ldr r0, =0x06204000			@;base VRAM
+	add r0, r1					@; R0 apunta a la primera baldosa de las franjas
+
+.Lbucle_franges:
+	cmp r2, #0
+	beq .Lend
+	mov r5, #0					@;offset fila
+	
+.Lbucle_vertical:
+	@; Filas exteriors: 0 y 24. Filas centrals: 8 y 16.
+	cmp r5, #0
+    beq .Lcheck_extrems
+    cmp r5, #24
+    beq .Lcheck_extrems
+	
+.Lcheck_centrals:
+	cmp r3, #0
+    moveq r10, r8                @;si tipu 0 = color zocalo
+    movne r10, r9                @;si tipu 1 = gris
+    b .Lwrite_vram
+	
+.Lcheck_extrems:
+	cmp r3, #0
+    moveq r10, r9                @;si tipus 0 = gris
+    movne r10, r8                @;si tipu 1 = color zocalo
+	
+.Lwrite_vram:
+	@;fila(r5) + columna(r4)
+	add r6, r4, r5				@; R6 apunta a columna inicial de p�xeles
+	add r6, #16					@; saltar 2 filas de p�xeles
+	ldrh r7, [r0, r6]			@; R7 = valor 2 bytes de baldosa a modificar
+	tst r4, #1
+	
+	andne r7, #0xFF				@; paridad �ndice columna impar:
+	movne r11, r10, lsl #8			@; limpiar byte alto, fijar byte alto
+    orrne r7, r11
+	
+	biceq r7, #0xFF				@; paridad �ndice columna par:
+	orreq r7, r10					@; limpiar byte bajo, fijar byte bajo
+	
+	strh r7, [r0, r6]            @; actualizar memoria de v�deo
+	
+	add r5, #8					@;seguent fila
+	cmp r5, #32
+	blo .Lbucle_vertical
+	
+	@; seguent franja
+	add r4, #1
+	cmp r4, #8
+    moveq r4, #0
+    addeq r0, #64
+	
+	sub r2, #1
+	b .Lbucle_franges
+	
+.Lend:
 	pop {r4-r11, pc}
 	
 .end

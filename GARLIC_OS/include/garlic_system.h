@@ -366,5 +366,7 @@ extern garlicMailbox _gd_mailboxes[8];
 //	FUNCIONS ADDICIONALS ProgM
 //------------------------------------------------------------------------------
 extern unsigned char _gm_zocMem[768];
+void _gm_pintarFranjas(unsigned char zocalo, unsigned short index_ini,
+							unsigned short num_franjas, unsigned char tipo_seg);
 
 #endif // _GARLIC_SYSTEM_h

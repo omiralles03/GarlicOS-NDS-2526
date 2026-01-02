@@ -237,23 +237,26 @@ void *_gm_do_malloc(unsigned int size, int zocalo) {
 	
 	if (comptador < n_franges) return NULL;	//si no hi ha espai
 	
-	for (int i = inici; i < inici + n_franges; i++) _gm_zocMem[i] = zocalo;
+	for (int i = inici; i < inici + n_franges; i++) _gm_zocMem[i] = (unsigned char)zocalo;
 	
-	int num = num_blocs_reservats[zocalo];
 	void *ptr = (void *)(0x01002000 + (inici * 32));
-	blocs_reservats[zocalo][num] = ptr;
-	franges_reservades[zocalo][num] = n_franges;
-	num_blocs_reservats[zocalo]++;
-
-	_gm_pintarFranjas(zocalo, inici, 1, 1);	//primera franja -> tipus 1
-	
-	//altres
-	if (n_franges > 1){
-		_gm_pintarFranjas(zocalo, inici + 1, n_franges - 1, 0);
-	}
-	
+	for (int i = 0; i < 4; i++) {
+        if (blocs_reservats[zocalo][i] == NULL) {
+            blocs_reservats[zocalo][i] = ptr;
+            franges_reservades[zocalo][i] = n_franges;
+            num_blocs_reservats[zocalo]++;
+           
+			_gm_pintarFranjas(zocalo, inici, 1, 1);	//primera franja -> tipus 1
+             
+            if (n_franges > 1) {
+				//altres
+                _gm_pintarFranjas(zocalo, inici + 1, n_franges - 1, 0);
+            }   
+            return ptr;
+        }
+    }
 	//per si de cas
-    return ptr;
+    return NULL;
 }
 
 int _gm_do_free(void *ptr, int zocalo) {
