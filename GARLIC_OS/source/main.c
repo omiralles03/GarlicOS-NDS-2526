@@ -284,12 +284,12 @@ void test_TADD()
     intFunc start;
     _gg_escribir("\n** TEST 3: Memoria Dinámica (TADD) **\n", 0, 0, 0);
     
-    start = _gm_cargarPrograma(10, "TADD"); // Carregar en zocalo lliure 
+    start = _gm_cargarPrograma(2, "TADD"); // Carregar en zocalo lliure 
     if (start){
-        _gp_crearProc(start, 10, "TADD", 0);
+        _gp_crearProc(start, 2, "TADD", 0);
         
         // esperar a que tadd finalitzi
-        while (_gd_pcbs[10].PID != 0)
+        while (_gd_pcbs[2].PID != 0)
         {
             _gp_WaitForVBlank();
             gestionSincronismos();
@@ -298,7 +298,16 @@ void test_TADD()
 		_gg_escribir("ERROR: No se pudo cargar TADD\n", 0, 0, 0);
 	}
 }
-
+/*
+void test_DESC(){
+	intFunc start = _gm_cargarPrograma(1, "DESC");
+	if(start){
+		_gp_crearProc(start, 1, "DESC", 1);
+	} else{
+		_gg_escribir("ERROR: No se pudo cargar TADD\n", 0, 0, 0);
+	}
+}
+*/
 
 /**
  * El programa de control mai pintará el grafic de espai ocupat
@@ -317,8 +326,10 @@ int main(int argc, char **argv) {
 	_gg_escribir("*** Joc de proves fase 2 / ProgM\n", 0, 0, 0);
 
 	if(test0()){
+		//test_DESC();
 		test_TADD();
 	}
+	//eliminaProc(2);
 	
 	_gg_escribir("\n*** Final joc de proves fase 2 / ProgM\n", 0, 0, 0);
 	while (1){
