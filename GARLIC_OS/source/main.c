@@ -148,7 +148,7 @@ unsigned char test0()
 			result = 0;
 		}
 		
-		esperaSegundos(3);
+		esperaSegundos(2);
 	}
 	return result;
 }
