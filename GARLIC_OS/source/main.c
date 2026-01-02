@@ -147,6 +147,8 @@ unsigned char test0()
 			_gg_escribir("\n", 0, 0, 0);
 			result = 0;
 		}
+		
+		esperaSegundos(3);
 	}
 	return result;
 }
@@ -162,7 +164,7 @@ unsigned char test0()
 			externa; la funci?n devuelve 0 si se han podido cargar los tres
 			programas, o 1 si ha habido algun problema con la carga de uno de
 			los programas.
-*/
+
 unsigned char test1()
 {
 	char *expected[3] = {"DESC", "LABE", "PRNT"};
@@ -196,7 +198,7 @@ unsigned char test1()
 	return result;
 }
 
-
+*/
 
 
 /* test 2: 	test de carga de programas de usuario de forma NO consecutiva,
@@ -212,7 +214,7 @@ unsigned char test1()
 			en posiciones inferiores a las del segmento de c?digo; la funci?n
 			devuelve 0 si se han podido cargar los tres programas, o 1 si ha
 			habido algun problema con la carga de uno de los programas.
-*/
+
 unsigned char test2()
 {
 	char *expected[3] = {"PONG", "DESC", "LABE"};
@@ -243,7 +245,7 @@ unsigned char test2()
 	}
 	return result;
 }
-
+*/
 
 
 /* Inicializaciones generales del sistema Garlic */
@@ -276,7 +278,33 @@ void inicializarSistema()
 	REG_IME = IME_ENABLE;			// activar las interrupciones en general
 }
 
+/**/
+void test_TADD()
+{
+    intFunc start;
+    _gg_escribir("\n** TEST 3: Memoria Dinámica (TADD) **\n", 0, 0, 0);
+    
+    start = _gm_cargarPrograma(10, "TADD"); // Carregar en zocalo lliure 
+    if (start){
+        _gp_crearProc(start, 10, "TADD", 0);
+        
+        // esperar a que tadd finalitzi
+        while (_gd_pcbs[10].PID != 0)
+        {
+            _gp_WaitForVBlank();
+            gestionSincronismos();
+        }
+    } else{
+		_gg_escribir("ERROR: No se pudo cargar TADD\n", 0, 0, 0);
+	}
+}
 
+
+/**
+ * El programa de control mai pintará el grafic de espai ocupat
+ * perque _gm_reservarMem crida a _gs_pintarFranjas, que com el
+ * numero de zocalo es 0, interpreta que ha de borrar. 
+*/
 //------------------------------------------------------------------------------
 int main(int argc, char **argv) {
 //------------------------------------------------------------------------------
@@ -286,14 +314,16 @@ int main(int argc, char **argv) {
 	_gg_escribir("* Sistema Operativo GARLIC 2.0 *", 0, 0, 0);
 	_gg_escribir("*                              *", 0, 0, 0);
 	_gg_escribir("********************************", 0, 0, 0);
-	_gg_escribir("*** Inicio fase 2 / ProgM\n", 0, 0, 0);
+	_gg_escribir("*** Joc de proves fase 2 / ProgM\n", 0, 0, 0);
 
-	if (test0())
-	{
-		if (test1())
-			test2();
+	if(test0()){
+		test_TADD();
 	}
-	_gg_escribir("\n*** Final fase 2 / ProgM\n", 0, 0, 0);
-	while (1) _gp_WaitForVBlank();
+	
+	_gg_escribir("\n*** Final joc de proves fase 2 / ProgM\n", 0, 0, 0);
+	while (1){
+		_gp_WaitForVBlank();
+		gestionSincronismos();	//per borrar grafics al acabar...
+	}
 	return 0;
 }

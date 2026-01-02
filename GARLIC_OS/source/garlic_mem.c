@@ -3,7 +3,8 @@
 	"garlic_mem.c" : fase 1 / programador M
 
 	Funciones de carga de un fichero ejecutable en formato ELF, para GARLIC 1.0
-
+	
+	Estudiant 1: arnau.faura@estudiants.urv.cat
 ------------------------------------------------------------------------------*/
 #include <nds.h>
 #include <filesystem.h>

@@ -2,6 +2,8 @@
 @;
 @;	"garlic_itcm_mem.s":	código de rutinas de soporte a la carga de
 @;							programas en memoria (version 2.0)
+@;	
+@;	Estudiant 1: arnau.faura@estudiants.urv.cat
 @;
 @;==============================================================================
 
