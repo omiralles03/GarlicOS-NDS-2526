@@ -15,8 +15,6 @@ extern int * punixTime;		// puntero a zona de memoria con el tiempo real
 
 const short divFreq1 = -33513982/(1024*7);		// frecuencia de TIMER1 = 7 Hz
 
-
-
 /* gestionSincronismos:	funci?n para detectar cu?ndo un proceso ha terminado
 						su ejecuci?n, consultando el bit i-?ssimo de la
 						variable global _gd_sincMain; en caso de detecci?n,
@@ -276,6 +274,11 @@ void inicializarSistema()
 	TIMER1_CR = 0xC3;  	// Timer Start | IRQ Enabled | Prescaler 3 (F/1024)
 	
 	REG_IME = IME_ENABLE;			// activar las interrupciones en general
+
+	// Color Gris en format BGR555 (R=15, G=15, B=15) -> 
+		//Hex aproximat: 0x3DEF. Escriure en index 96 (cada color son 2B)
+			//BG_PALETTE_SUB definit a nds.h
+	BG_PALETTE_SUB[1] = 0x3DEF;
 }
 
 /**/

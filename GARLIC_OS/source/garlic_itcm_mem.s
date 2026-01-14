@@ -341,7 +341,7 @@ _gm_rsiTIMER1:
 	@; r3 = tipus franja - 0: franja normal; 1: franja invertida
 	
 	@;_gs_pintarFranjas(zocalo, index_ini, num_franjas, tipo_seg)
-	@;96 -> gris en _gs_pintarFranja -> _gs_colZoc
+	@;1 = color gris redefinit en el main.c
 _gm_pintarFranjas:
 	push {r4-r11, lr}
 	

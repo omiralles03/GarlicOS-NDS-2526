@@ -9,6 +9,14 @@
 
 #include <GARLIC_API.h>	
 
+void mi_delay(int segundos) {
+    int frames = segundos * 60; // 60 frames por segundo
+    while (frames > 0) {
+        GARLIC_delay(0); // Espera 1 frame (aprox 16ms) y cede CPU
+        frames--;
+    }
+}
+
 int _start(int arg) {
 	void *p1, *p2;	
 	GARLIC_printf("TEST INICIO PROVANT MEMORIA DINAMICA\n", 0, 0, 2);
@@ -17,16 +25,22 @@ int _start(int arg) {
 	
 	if(p1) GARLIC_printf("- P1 en %x\n", p1, 0, 2);
 	
-	GARLIC_delay(2);
+	//GARLIC_delay(2); DECISION TO MAKE THE "MANUAL" DELAY BECAUSE OF PROGP 
+		//DEPENDENCIES
+	
+	mi_delay(2);
 	
 	p2 = GARLIC_malloc(32); // 1 franja
     if (p2) GARLIC_printf("- P2 en %x\n", p2);
 	
-	GARLIC_delay(4);
+	//GARLIC_delay(4);
+	mi_delay(4);
 	
 	GARLIC_free(p1);
     GARLIC_free(p2);
 	
+	mi_delay(4);
+
 	GARLIC_printf("TEST FIN\n", 0, 0, 2);
     return 0;
 }
