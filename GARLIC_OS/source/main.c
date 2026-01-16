@@ -324,39 +324,87 @@ void eliminaProcs(){
 	}
 }
 
-unsigned char test4_MMLL(){
+void test4_MMLL(){
 	char *progName = "MMLL";
 	unsigned char zocalo = 1; // Reutilitzo zocalo 1 (pq es visible)
-	int arg = 1;              // Argument: 100^2 el.
+	int args[3] = {0, 1, 2};              // Argument: 100^2 el.
 	intFunc start_mmll;
-	unsigned char result = 0;
+	int i;
 
 	_gg_escribir("\n** TEST 4: Programa MMLL (Calculo) **\n", 0, 0, 0);
 	
-	start_mmll = _gm_cargarPrograma(zocalo, progName);
-	
-	if (start_mmll)
-	{
-		_gp_crearProc(start_mmll, zocalo, progName, arg);
+	for (i = 0; i < 3; i++){
+		_gg_escribir("-> Ejecutando MMLL con arg=%d...\n", args[i], 0, 0);
+		start_mmll = _gm_cargarPrograma(zocalo, progName);
 		
-		_gg_escribir("Executant MMLL...\n", 0, 0, 0);
-		
-		while (_gd_pcbs[zocalo].PID != 0)
-		{
-			_gp_WaitForVBlank();
-			gestionSincronismos();
+		if (start_mmll){
+			_gp_crearProc(start_mmll, zocalo, progName, args[i]);
+			while (_gd_pcbs[zocalo].PID != 0)	//esperar a que acabi
+			{
+				_gp_WaitForVBlank();
+				gestionSincronismos();
+			}
+		} else {
+			_gg_escribir("ERROR: En carrega MMLL (Iter %d)\n", i, 0, 0);
 		}
-		
-		_gg_escribir("END MMLL.\n", 0, 0, 0);
-		result = 1;
+		esperaSegundos(1); //visual
 	}
-	else
-	{
-		_gg_escribir("\nERROR: No s'ha pogut carregar MMLL.elf\n", 0, 0, 0);
-	}
-	return result;
+	_gg_escribir("MMLL Test COMPLETED.\n", 0, 0, 0);
 
 }
+
+/* Saturació memòria*/
+void test5_MemoriaFull()
+{
+	char *relleno = "PONG";  
+	char *grande = "LABE";   // Programa amb 2 segments (Code+Data)
+	intFunc start;
+	int i;
+	int cargados = 0;
+
+	_gg_escribir("\n** TEST 5: ESTRES DE MEMORIA **\n", 0, 0, 0);
+	_gg_escribir("(Emplenant memòria fins al max...)\n", 0, 0, 0);
+
+	// Llenamos los zócalos 1 al 12 con PONG
+	// Nota: Nomès _gm_cargarPrograma, NO creo proces
+	for (i = 1; i <= 12; i++) {
+		start = _gm_cargarPrograma(i, relleno);
+		if (start) {
+			cargados++;
+		} else {
+			_gg_escribir("Memoria llena en zocalo %d.\n", i, 0, 0);
+			break; // Memoria llena antes de lo previsto
+		}
+	}
+	_gg_escribir("S'han carregat %d copias de PONG.\n", cargados, 0, 0);
+
+	esperaSegundos(2);
+	
+	// cargar LABE en zocal 13
+	// Hauria de fallar
+	_gg_escribir("Intentant cargar LABE (ha de fallar)...\n", 0, 0, 0);
+	start = _gm_cargarPrograma(13, grande);
+	
+	esperaSegundos(2);
+
+	if (start == 0) {
+		_gg_escribir("OK: Carrega denegada (Full)\n", 0, 0, 0);
+	} else {
+		_gg_escribir("ERROR: S'ha carregat LABE\n", 0, 0, 0);
+		// Si se carga, lo marcamos para borrarlo luego
+		_gd_pcbs[13].PID = 0; 
+		_gm_liberarMem(13); 
+	}
+
+	// lliberar manualment perque no he creat els processos
+	_gg_escribir("Netejant...\n", 0, 0, 0);
+	for (i = 1; i <= 12; i++) {
+		_gm_liberarMem(i);
+	}
+	_gs_dibujarTabla(); // forçar resfrecada del grafic
+}
+
+
 //------------------------------------------------------------------------------
 int main(int argc, char **argv) {
 //------------------------------------------------------------------------------
@@ -374,13 +422,20 @@ int main(int argc, char **argv) {
 			if(test2()){
 				esperaSegundos(2);
 				
-				eliminaProcs(); // Borrar LABE/DESC/PONG
+				//eliminaProcs(); // Borrar LABE/DESC/PONG
 				test3(); //Execució TADD per provar les addicionals
 				
 				esperaSegundos(1);
+				_gg_escribir("Preparant execució MMLL\n", 0, 0, 0);
 				test4_MMLL();   // Execució MMLL per provar prog. usuari fase 1
 				
-				eliminaProcs();	
+				esperaSegundos(1);
+				_gg_escribir("\nNetejant per STRESS test...\n", 0, 0, 0);
+				//eliminaProcs();	
+				test5_MemoriaFull();
+				
+				//Neteja final
+				eliminaProcs();
 			}
 		}
 			
