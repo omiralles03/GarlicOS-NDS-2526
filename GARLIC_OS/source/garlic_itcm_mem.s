@@ -40,76 +40,58 @@ _gm_zocMem:	.space NUM_FRANJAS			@; vector de ocupaci�n de franjas mem.
 	@;Resultado:
 	@; cambio de las direcciones de memoria que se tienen que ajustar
 _gm_reubicar:
-	push {r4-r11, lr}
-	
-	ldr r4,  [sp, #36]	@; recuperacion "r5" de la pila
-	
-	@; calculo offsets code y data
-	sub r5, r2, r1		
-	sub r6, r4, r3
+    push {r0-r12, lr}
+    sub r2, r1                  @; R2 = off reubicació codi
+    ldr r12, [sp, #56]          @; dest_data
+    sub r12, r3                 @; R12 = off reubicació dades
 
-	mov r4, r0
-	
-	@; buscar la taula de seccions del .elf
-    ldr r7, [r4, #32]	@; e_shoff
-    add r7, r4, r7
-    ldrh r8, [r4, #48]	@; e_shnum
-    ldrh r9, [r4, #46]	@; e_shentsize
+    ldr r4, [r0, #32]           @; e_shoff (taula seccions)
+    ldrh r10, [r0, #46]         @; e_shsize
+    ldrh r5, [r0, #48]          @; e_shnum
+    add r4, r0                  @; R4 = 1a secció
 
-.Lbucle_seccions:
-	cmp r8, #0
-    beq .Lfi_reubicacio
+.LSeccionsLoop:
+    ldr r9, [r4, #4]            @; tipus secció
+    cmp r9, #9                  @; SHT_REL?
+    bne .LNoRelocacio
 
-    ldr r0, [r7, #4]	@; sh_type
-    cmp r0, #9          @; seccio de reubicació (SHT_REL) ==? 9
-    bne .Lnext_seccio
+    ldr r6, [r4, #16]           @; off secció
+    ldr r7, [r4, #20]           @; mida secció
+    ldr r8, [r4, #36]           @; mida entrada REL
+    add r6, r0                  @; inici REL
 
-    ldr r10, [r7, #16]	@;sh_offset
-    add r10, r4, r10
-    ldr r11, [r7, #20]	@;sh_size
-    add r11, r1, r11	
-	
-.Lbucle_reubicadors:
-	cmp r10, r11
-    bge .Lnext_seccio
+.LRelocLoop:
+    ldr r9, [r6, #4]            @; info reloc
+    and r9, #0xFF               @; tipus reloc
+    cmp r9, #2                  @; R_ARM_ABS32?
+    bne .LSeguentReloc
 
-    ldr r0, [r10], #4    @; r_offset
-    ldr r1, [r10], #4    @; r_info (tipo de reubicación)
+    ldr r9, [r6]                @; off reubicació
+    add r9, r2                  @; aplicar off codi
+    ldr r1, [r9]                @; dir original
+    cmp r3, #0                  @; un sol segment?
+    addeq r1, r2                @; off codi
+    beq .LGuardarReloc
+    cmp r1, r3                  @; dir dades?
+    addlo r1, r2                @; off codi
+    addhs r1, r12               @; off dades
 
-    and r1, r1, #0xFF
-    cmp r1, #2           @; tipus R_ARM_ABS32 ? 
-    bne .Lbucle_reubicadors
+.LGuardarReloc:
+    str r1, [r9]                @; escriure dir
 
-    @; correccio de l'adreça
-    add r0, r0, r5       @; adreça real a modificar = (r_offset + code offset)
-    ldr r1, [r0]        
-	
-	@;decisio offset aplicable 
-	cmp r3, #0			@; existeix segment dades?
-	beq .Lreub_code
-	cmp r1, r3			@; valor apunta a zona de dades?
-	blo .Lreub_code
-	
-@;aplica offset data
-.Lreub_data:
-	add r1, r1, r6
-	b .Lreub_store
+.LSeguentReloc:
+    sub r7, r8                  @; resta entrada
+    add r6, r8                  @; seguent REL
+    cmp r7, #0
+    bne .LRelocLoop
 
-@;aplica offset codi	
-.Lreub_code:
-	add r1, r1, r5
+.LNoRelocacio:
+    sub r5, #1                  @; --seccions
+    add r4, r10                 @; seguent secció
+    cmp r5, #0
+    bne .LSeccionsLoop
 
-.Lreub_store:
-	str r1, [r0]
-	b .Lbucle_reubicadors
-
-.Lnext_seccio:
-	add r7, r7, r9          @;next SH entry
-    sub r8, r8, #1
-    b .Lbucle_seccions
-	
-.Lfi_reubicacio:
-	pop {r4-r11, pc}
+    pop {r0-r12, pc}
 
 .global _gm_reservarMem
 	@; Rutina para reservar un conjunto de franjas de memoria libres
