@@ -110,7 +110,7 @@ unsigned char test0()
 {
 	char *progs[16];	// se asume que para realizar este test nunca habrá más
 						// de 16 programas de usuario contenidos en "/Programas/"
-	char *expected[4] = {"DESC", "LABE", "PONG", "PRNT"};
+	char *expected[6] = {"DESC", "LABE", "PONG", "PRNT", "TADD", "MMLL"};
 	unsigned char num_progs, i, j, k;
 	unsigned char result = 1;
 	
@@ -128,7 +128,7 @@ unsigned char test0()
 		{
 			_gg_escribir((i < 10 ? "\t %d: %s\t" : "\t%d: %s\t"), i, (unsigned int) progs[i], 0);
 			j = 0;
-			while ((k != 15) && (j < 4))
+			while ((k != 63) && (j < 6))
 			{
 				if (((k & (1 << j)) == 0) && (strcmp(progs[i], expected[j]) == 0))
 					k |= (1 << j);		// activa el bit de un programa esperado
@@ -136,7 +136,7 @@ unsigned char test0()
 			}
 		}
 		_gg_escribir((i & 1 ? "\n\n" : "\n"), 0, 0, 0);
-		if (k != 15)
+		if (k != 63)
 		{
 			_gg_escribir("\nERROR: Faltan los siguientes programas:\n", 0, 0, 0);
 			for (i = 0; i < 4; i++)
@@ -287,7 +287,7 @@ void inicializarSistema()
 unsigned char test3()
 {
 	char *progName = "TADD";
-	unsigned char zocalo = 15;
+	unsigned char zocalo = 3;
 	intFunc start_tadd;
 	unsigned char result = 0;
 
@@ -318,6 +318,45 @@ unsigned char test3()
 	return result;
 }
 
+void eliminaProcs(){
+	for (int i = 1; i <= 15; i++){
+		eliminaProc(i);
+	}
+}
+
+unsigned char test4_MMLL(){
+	char *progName = "MMLL";
+	unsigned char zocalo = 1; // Reutilitzo zocalo 1 (pq es visible)
+	int arg = 1;              // Argument: 100^2 el.
+	intFunc start_mmll;
+	unsigned char result = 0;
+
+	_gg_escribir("\n** TEST 4: Programa MMLL (Calculo) **\n", 0, 0, 0);
+	
+	start_mmll = _gm_cargarPrograma(zocalo, progName);
+	
+	if (start_mmll)
+	{
+		_gp_crearProc(start_mmll, zocalo, progName, arg);
+		
+		_gg_escribir("Executant MMLL...\n", 0, 0, 0);
+		
+		while (_gd_pcbs[zocalo].PID != 0)
+		{
+			_gp_WaitForVBlank();
+			gestionSincronismos();
+		}
+		
+		_gg_escribir("END MMLL.\n", 0, 0, 0);
+		result = 1;
+	}
+	else
+	{
+		_gg_escribir("\nERROR: No s'ha pogut carregar MMLL.elf\n", 0, 0, 0);
+	}
+	return result;
+
+}
 //------------------------------------------------------------------------------
 int main(int argc, char **argv) {
 //------------------------------------------------------------------------------
@@ -334,7 +373,14 @@ int main(int argc, char **argv) {
 		if (test1()){
 			if(test2()){
 				esperaSegundos(2);
-				test3();
+				
+				eliminaProcs(); // Borrar LABE/DESC/PONG
+				test3(); //Execució TADD per provar les addicionals
+				
+				esperaSegundos(1);
+				test4_MMLL();   // Execució MMLL per provar prog. usuari fase 1
+				
+				eliminaProcs();	
 			}
 		}
 			

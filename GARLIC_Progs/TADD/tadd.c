@@ -20,6 +20,7 @@ void mi_delay(int segundos) {
 int _start(int arg) {
 	void *p1, *p2, *p3, *p4, *p_fail;	
 	int res;
+	int res2;
 
 	GARLIC_printf("[TADD %d] TEST MEMORIA DINAMICA\n", 0, 0, 0);
 	
@@ -76,13 +77,16 @@ int _start(int arg) {
     // TEST FRAGMENTACION (Huecos)
     // -------------------------------------------------------------
 	GARLIC_printf("Test Huecos (Llibero P2)\n", 0, 0, 0);
-    GARLIC_free(p2); // deixar hueco entre P1 y P3
-    
+	
+    res2 = GARLIC_free(p3); // deixar hueco entre P2 y P4
+    if(res2 == 0) GARLIC_printf(" -> FAIL: No s'ha esborrat\n", 0, 0, 0);
+    else if(res2 == 1) GARLIC_printf(" -> OK: Free ha acceptat correctament\n", 0, 0, 0);
+	
     mi_delay(2); // per veure hueco a pantalla
 
     GARLIC_printf(" Emplenant hueco...\n", 0, 0, 0);
-    p2 = GARLIC_malloc(32); 
-    if(p2) GARLIC_printf(" -> Re-reservt en %x\n", p2, 0, 0);
+    p3 = GARLIC_malloc(32); 
+    if(p3) GARLIC_printf(" -> Re-reservt en %x\n", p3, 0, 0);
 
     mi_delay(2);
 	

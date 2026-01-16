@@ -87,15 +87,21 @@ mi_delay:
 	.ascii	"Test Huecos (Llibero P2)\012\000"
 	.align	2
 .LC14:
-	.ascii	" Emplenant hueco...\012\000"
+	.ascii	" -> FAIL: No s'ha esborrat\012\000"
 	.align	2
 .LC15:
-	.ascii	" -> Re-reservt en %x\012\000"
+	.ascii	" -> OK: Free ha acceptat correctament\012\000"
 	.align	2
 .LC16:
-	.ascii	"Neteja final...\012\000"
+	.ascii	" Emplenant hueco...\012\000"
 	.align	2
 .LC17:
+	.ascii	" -> Re-reservt en %x\012\000"
+	.align	2
+.LC18:
+	.ascii	"Neteja final...\012\000"
+	.align	2
+.LC19:
 	.ascii	"[TADD %d] END Test\012\000"
 	.text
 	.align	2
@@ -105,38 +111,38 @@ mi_delay:
 	.fpu softvfp
 	.type	_start, %function
 _start:
-	@ args = 0, pretend = 0, frame = 32
+	@ args = 0, pretend = 0, frame = 40
 	@ frame_needed = 0, uses_anonymous_args = 0
 	str	lr, [sp, #-4]!
-	sub	sp, sp, #36
+	sub	sp, sp, #44
 	str	r0, [sp, #4]
 	mov	r3, #0
 	mov	r2, #0
 	mov	r1, #0
-	ldr	r0, .L15
+	ldr	r0, .L17
 	bl	GARLIC_printf
 	mov	r3, #0
 	mov	r2, #0
 	mov	r1, #0
-	ldr	r0, .L15+4
+	ldr	r0, .L17+4
 	bl	GARLIC_printf
 	mov	r0, #320
 	bl	GARLIC_malloc
-	str	r0, [sp, #28]
-	ldr	r3, [sp, #28]
+	str	r0, [sp, #36]
+	ldr	r3, [sp, #36]
 	cmp	r3, #0
 	beq	.L5
 	mov	r3, #0
 	mov	r2, #0
-	ldr	r1, [sp, #28]
-	ldr	r0, .L15+8
+	ldr	r1, [sp, #36]
+	ldr	r0, .L17+8
 	bl	GARLIC_printf
 	b	.L6
 .L5:
 	mov	r3, #0
 	mov	r2, #0
 	mov	r1, #0
-	ldr	r0, .L15+12
+	ldr	r0, .L17+12
 	bl	GARLIC_printf
 .L6:
 	mov	r0, #2
@@ -144,37 +150,37 @@ _start:
 	mov	r3, #0
 	mov	r2, #0
 	mov	r1, #0
-	ldr	r0, .L15+16
+	ldr	r0, .L17+16
 	bl	GARLIC_printf
 	mov	r0, #32
 	bl	GARLIC_malloc
+	str	r0, [sp, #32]
+	mov	r0, #32
+	bl	GARLIC_malloc
+	str	r0, [sp, #28]
+	mov	r0, #32
+	bl	GARLIC_malloc
 	str	r0, [sp, #24]
-	mov	r0, #32
-	bl	GARLIC_malloc
-	str	r0, [sp, #20]
-	mov	r0, #32
-	bl	GARLIC_malloc
-	str	r0, [sp, #16]
+	ldr	r3, [sp, #32]
+	cmp	r3, #0
+	beq	.L7
+	ldr	r3, [sp, #28]
+	cmp	r3, #0
+	beq	.L7
 	ldr	r3, [sp, #24]
-	cmp	r3, #0
-	beq	.L7
-	ldr	r3, [sp, #20]
-	cmp	r3, #0
-	beq	.L7
-	ldr	r3, [sp, #16]
 	cmp	r3, #0
 	beq	.L7
 	mov	r3, #0
 	mov	r2, #0
 	mov	r1, #0
-	ldr	r0, .L15+20
+	ldr	r0, .L17+20
 	bl	GARLIC_printf
 	b	.L8
 .L7:
 	mov	r3, #0
 	mov	r2, #0
 	mov	r1, #0
-	ldr	r0, .L15+24
+	ldr	r0, .L17+24
 	bl	GARLIC_printf
 .L8:
 	mov	r0, #2
@@ -182,25 +188,25 @@ _start:
 	mov	r3, #0
 	mov	r2, #0
 	mov	r1, #0
-	ldr	r0, .L15+28
+	ldr	r0, .L17+28
 	bl	GARLIC_printf
 	mov	r0, #32
 	bl	GARLIC_malloc
-	str	r0, [sp, #12]
-	ldr	r3, [sp, #12]
+	str	r0, [sp, #20]
+	ldr	r3, [sp, #20]
 	cmp	r3, #0
 	bne	.L9
 	mov	r3, #0
 	mov	r2, #0
 	mov	r1, #0
-	ldr	r0, .L15+32
+	ldr	r0, .L17+32
 	bl	GARLIC_printf
 	b	.L10
 .L9:
 	mov	r3, #0
 	mov	r2, #0
 	mov	r1, #0
-	ldr	r0, .L15+36
+	ldr	r0, .L17+36
 	bl	GARLIC_printf
 .L10:
 	mov	r0, #2
@@ -208,25 +214,25 @@ _start:
 	mov	r3, #0
 	mov	r2, #0
 	mov	r1, #0
-	ldr	r0, .L15+40
+	ldr	r0, .L17+40
 	bl	GARLIC_printf
-	ldr	r0, .L15+44
+	ldr	r0, .L17+44
 	bl	GARLIC_free
-	str	r0, [sp, #8]
-	ldr	r3, [sp, #8]
+	str	r0, [sp, #16]
+	ldr	r3, [sp, #16]
 	cmp	r3, #0
 	bne	.L11
 	mov	r3, #0
 	mov	r2, #0
 	mov	r1, #0
-	ldr	r0, .L15+48
+	ldr	r0, .L17+48
 	bl	GARLIC_printf
 	b	.L12
 .L11:
 	mov	r3, #0
 	mov	r2, #0
 	mov	r1, #0
-	ldr	r0, .L15+52
+	ldr	r0, .L17+52
 	bl	GARLIC_printf
 .L12:
 	mov	r0, #2
@@ -234,57 +240,77 @@ _start:
 	mov	r3, #0
 	mov	r2, #0
 	mov	r1, #0
-	ldr	r0, .L15+56
+	ldr	r0, .L17+56
 	bl	GARLIC_printf
-	ldr	r0, [sp, #24]
+	ldr	r0, [sp, #28]
 	bl	GARLIC_free
+	str	r0, [sp, #12]
+	ldr	r3, [sp, #12]
+	cmp	r3, #0
+	bne	.L13
+	mov	r3, #0
+	mov	r2, #0
+	mov	r1, #0
+	ldr	r0, .L17+60
+	bl	GARLIC_printf
+	b	.L14
+.L13:
+	ldr	r3, [sp, #12]
+	cmp	r3, #1
+	bne	.L14
+	mov	r3, #0
+	mov	r2, #0
+	mov	r1, #0
+	ldr	r0, .L17+64
+	bl	GARLIC_printf
+.L14:
 	mov	r0, #2
 	bl	mi_delay
 	mov	r3, #0
 	mov	r2, #0
 	mov	r1, #0
-	ldr	r0, .L15+60
+	ldr	r0, .L17+68
 	bl	GARLIC_printf
 	mov	r0, #32
 	bl	GARLIC_malloc
-	str	r0, [sp, #24]
-	ldr	r3, [sp, #24]
+	str	r0, [sp, #28]
+	ldr	r3, [sp, #28]
 	cmp	r3, #0
-	beq	.L13
+	beq	.L15
 	mov	r3, #0
 	mov	r2, #0
-	ldr	r1, [sp, #24]
-	ldr	r0, .L15+64
+	ldr	r1, [sp, #28]
+	ldr	r0, .L17+72
 	bl	GARLIC_printf
-.L13:
+.L15:
 	mov	r0, #2
 	bl	mi_delay
 	mov	r3, #0
 	mov	r2, #0
 	mov	r1, #0
-	ldr	r0, .L15+68
+	ldr	r0, .L17+76
 	bl	GARLIC_printf
+	ldr	r0, [sp, #36]
+	bl	GARLIC_free
+	ldr	r0, [sp, #32]
+	bl	GARLIC_free
 	ldr	r0, [sp, #28]
 	bl	GARLIC_free
 	ldr	r0, [sp, #24]
 	bl	GARLIC_free
-	ldr	r0, [sp, #20]
-	bl	GARLIC_free
-	ldr	r0, [sp, #16]
-	bl	GARLIC_free
 	mov	r3, #0
 	mov	r2, #0
 	mov	r1, #0
-	ldr	r0, .L15+72
+	ldr	r0, .L17+80
 	bl	GARLIC_printf
 	mov	r3, #0
 	mov	r0, r3
-	add	sp, sp, #36
+	add	sp, sp, #44
 	@ sp needed
 	ldr	pc, [sp], #4
-.L16:
+.L18:
 	.align	2
-.L15:
+.L17:
 	.word	.LC0
 	.word	.LC1
 	.word	.LC2
@@ -304,5 +330,7 @@ _start:
 	.word	.LC15
 	.word	.LC16
 	.word	.LC17
+	.word	.LC18
+	.word	.LC19
 	.size	_start, .-_start
 	.ident	"GCC: (devkitARM release 46) 6.3.0"

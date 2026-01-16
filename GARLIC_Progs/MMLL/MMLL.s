@@ -147,12 +147,15 @@ _start:
 	mov	r0, r3
 	bl	_power100
 	strd	r0, [sp, #32]
+	mov	r3, #0
+	mov	r2, #0
 	ldr	r1, [sp, #44]
 	ldr	r0, .L17
 	bl	GARLIC_printf
 	ldr	r3, [sp, #4]
-	add	r3, r3, #1
-	mov	r1, r3
+	add	r1, r3, #1
+	mov	r3, #0
+	mov	r2, #0
 	ldr	r0, .L17+4
 	bl	GARLIC_printf
 	ldrd	r2, [sp, #32]
@@ -167,6 +170,9 @@ _start:
 	strd	r2, [sp, #48]
 	b	.L13
 .L10:
+	mov	r3, #0
+	mov	r2, #0
+	mov	r1, #0
 	ldr	r0, .L17+8
 	bl	GARLIC_printf
 	mov	r3, #0
@@ -214,16 +220,23 @@ _start:
 	str	r3, [sp, #12]
 	ldr	r3, [sp, #56]
 	str	r3, [sp, #8]
+	mov	r3, #0
+	mov	r2, #0
+	mov	r1, #0
 	ldr	r0, .L17+12
 	bl	GARLIC_printf
+	mov	r3, #0
 	ldr	r2, [sp, #16]
 	ldr	r1, [sp, #20]
 	ldr	r0, .L17+16
 	bl	GARLIC_printf
+	mov	r3, #0
 	ldr	r2, [sp, #8]
 	ldr	r1, [sp, #12]
 	ldr	r0, .L17+20
 	bl	GARLIC_printf
+	mov	r3, #0
+	mov	r2, #0
 	ldr	r1, [sp, #44]
 	ldr	r0, .L17+24
 	bl	GARLIC_printf

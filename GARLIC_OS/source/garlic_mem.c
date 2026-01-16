@@ -253,7 +253,6 @@ void *_gm_do_malloc(unsigned int size, int zocalo) {
 				//altres
                 _gm_pintarFranjas(zocalo, inici + 1, n_franges - 1, 0);
             }   
-			_gg_escribir("DEBUG MALLOC: Zoc %d pide -> Devuelve %x\n", zocalo, ptr, 0);
             return ptr;
         }
     }
