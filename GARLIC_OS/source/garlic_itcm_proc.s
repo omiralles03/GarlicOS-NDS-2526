@@ -739,51 +739,106 @@ _gp_desinhibirIRQs:
 _gp_rsiTIMER0:
 	push {r0-r6, lr}
 		
-		@; Calculem el valor total de tics de tots els processos
-		ldr r4, =_gd_pcbs				@; Adreça del vector de PCBs
-		mov r5, #0						@; Acumulador de la suma total
-		mov r6, #0						@; Index del bucle (0..15)
+		@; Calcular Tics Totals
+		ldr r4, =_gd_pcbs
+		mov r5, #0						@; Acumulador de tics totals
+		mov r6, #0						@; Index del bucle
 		
 		.Lloop_suma:
 			ldr r3, [r4, #PCB_TICKS]
-			ldr r2, =0xFFFFFF			@; Màscara pels 24 bits baixos de workTicks
-			and r3, r3, r2				@; Filtrem els 24 bits
-			add r5, r5, r3				@; Sumem al total de tics
+			ldr r2, =0xFFFFFF			@; Màscara 24 bits
+			and r3, r3, r2
+			add r5, r5, r3
 			
-			add r4, r4, #PCB_SIZE		@; Passem al seguent PCB
-			add r6, r6, #1				@; Incrementem index del bucle
+			add r4, r4, #PCB_SIZE
+			add r6, r6, #1
 			cmp r6, #16
-			blt .Lloop_suma				@; Mirem si hem acabat el bucle
+			blt .Lloop_suma
 			
 		cmp r5, #50
-		blt .Lfi_timer					@; Si encara no sumem 100 tics totals, sortim
+		blt .Lfi_timer					@; Si no ha passat 1 segon, sortim
 		
-		@; Actualitzem porcentatges i reinciem comptadors
+		@; Calcular Percentatges i Pintar
 		ldr r4, =_gd_pcbs
-		mov r6, #0						@; Reiniciem el comptador del bucle
+		mov r6, #0						@; Reiniciem index sòcol
 		
 		.Lloop_calc:
-			ldr r3, [r4, #PCB_TICKS]	@; Carreguem workTicks
-			ldr r2, =0xFFFFFF			@; Màscara per filtrar els 24 bits baixos
-			and r0, r3, r2				@; R0 = Tics actuals (que és igual a %)
+			ldr r3, [r4, #PCB_TICKS]
+			ldr r2, =0xFFFFFF
+			and r0, r3, r2				@; R0 = Tics actuals (% ús)
 			
-			lsl r0, r0, #24				@; Movem el percentatge als 8 bits alts per guardar a workTicks
-			str r0, [r4, #PCB_TICKS]	@; Guardem el percentatge a workTicks
+			lsl r1, r0, #24				@; Guardem el % als 8 bits alts
+			str r1, [r4, #PCB_TICKS]	@; I posem a 0 els tics baixos
 			
-			add r4, r4, #PCB_SIZE		@; Passem al seguent PCB
-			add r6, r6, #1				@; Incrementem index del bucle
-			cmp r6, #16					
-			blt .Lloop_calc				@; Comprovem que el index sigui < 16, sino acabem bucle
+			@; Imprimim porcentatge
+			push {r0-r6}				@; Guardem registres abans de pintar
 			
+			@; Només pintem si el PID != 0 o és el sòcol 0
+			ldr r1, [r4, #PCB_PID]
+			cmp r1, #0
+			bne .Lpintar
+			cmp r6, #0
+			bne .Lno_pintar				@; Si PID=0 i no és sòcol 0, saltem
+			
+		.Lpintar:
+			@; Convertir R0 (0-99) a text
+			mov r2, r0					@; R2 = Número inicial (serà les unitats)
+			mov r3, #0					@; R3 = Comptador de desenes
+			
+		.Ldiv10_loop:
+			cmp r2, #10
+			blt .Ldiv10_end
+			sub r2, r2, #10				@; Restem 10
+			add r3, r3, #1				@; Incrementem desenes
+			b .Ldiv10_loop
+			
+		.Ldiv10_end:
+			@; Ara R3 = Desenes, R2 = Unitats. Convertim a ASCII.
+			add r2, r2, #48
+			add r3, r3, #48
+			
+			@; Preparar buffer a la pila (4 bytes)
+			sub sp, sp, #4
+			mov r1, sp
+			
+			@; Gestió del zero a l'esquerra (si desenes és '0', posem espai)
+			cmp r3, #48
+			bne .Lstore_chars
+			mov r3, #32					@; Espai en blanc
+			
+		.Lstore_chars:
+			strb r3, [r1, #1]			@; Desenes
+			strb r2, [r1, #2]			@; Unitats
+			mov r2, #32
+			strb r2, [r1, #0]			@; Espai davant (alineació)
+			mov r2, #0
+			strb r2, [r1, #3]			@; Final de string
+			
+			@; Cridar _gs_escribirStringSub
+			mov r0, r1					@; String
+			add r1, r6, #4				@; Fila = Sòcol + 4
+			mov r2, #28					@; Columna = 28 (Uso)
+			mov r3, #0					@; Color = 0 (Blanc)
+			bl _gs_escribirStringSub
+			
+			add sp, sp, #4				@; Netejem pila local
+			
+		.Lno_pintar:
+			pop {r0-r6}					@; Recuperem registres
+			@; -----------------------------
+			
+			add r4, r4, #PCB_SIZE
+			add r6, r6, #1
+			cmp r6, #16
+			blt .Lloop_calc
 			
 		ldr r4, =_gd_sincMain
-		ldr r5, [r4]					
-		orr r5, r5, #1			
-		str r5, [r4]					@; Posem a 1 el bit 0 de sincMain
+		ldr r5, [r4]
+		orr r5, r5, #1
+		str r5, [r4]
 		
-		.Lfi_timer:
+	.Lfi_timer:
 	pop {r0-r6, pc}
-
 
 	
 	.global _ga_send
@@ -934,6 +989,11 @@ _ga_receive:
 			ldr r0, =_gd_pidz			@; Carreguem adreça de pidz (línia nova)
 			ldr r1, [r0]				@; Llegim el valor actual (línia nova)
 			orr r1, r1, #0x80000000		@; Activem Bit 31 per indicar bloqueig (línia nova)
+			
+			and r8, r8, #0x7			@; Assegurem que l'ID (R8) és 0-7
+			lsl r8, r8, #28				@; Desplacem l'ID a la posició 28 (bits alts)
+			orr r1, r1, r8				@; El combinem amb el PIDZ actual
+			
 			str r1, [r0]				@; Guardem el canvi (línia nova)
 
 		.Lblock_wait:

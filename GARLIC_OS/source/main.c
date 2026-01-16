@@ -3,7 +3,7 @@
 	"main.c" : fase 2 / progP
 
 	Versión final de GARLIC 2.0
-	(multiplexación, retardar procesos, matar procesos)
+	(multiplexación, retardar procesos, matar procesos + TEST BÚSTIES)
 
 ------------------------------------------------------------------------------*/
 #include <nds.h>
@@ -15,10 +15,53 @@ extern int * punixTime;		// puntero a zona de memoria con el tiempo real
 
 const short divFreq0 = -33513982/1024;		// frecuencia de TIMER0 = 1 Hz
 
+// --- Declaracions externes per a les bústies (progP) ---
+extern int _ga_send(int n, int data);
+extern int _ga_receive(int n);
+// -------------------------------------------------------
 
-/* función para escribir los porcentajes de uso de la CPU de los procesos de los
-		cuatro primeros zócalos, en el caso que la RSI del TIMER0 haya realizado
-		el cálculo */
+/* FUNCIONS AUXILIARS PER AL TEST DE BÚSTIES */
+
+/* CONSUMIDOR (Llegeix i es bloqueja si està buida) */
+void aux_consumidor(int arg)
+{
+	_gg_escribir("CONSUMIDOR (Soc 1):\n", 0, 0, 1);
+	_gg_escribir("Intento llegir Bustia 0...\n", 0, 0, 1);
+	
+	// Aquesta crida bloqueja el procés perquè la bústia 0 està buida.
+	int dada = _ga_receive(0);
+	
+	_gg_escribir("JA TINC LA DADA!\n", 0, 0, 1);
+	_gg_escribir("Valor rebut: %d \n", dada, 0, 1);
+	
+	while(1) _gp_WaitForVBlank(); // Es queda viu
+}
+
+/* PRODUCTOR (Espera uns segons i envia) */
+void aux_productor(int arg)
+{
+	_gg_escribir("PRODUCTOR (Soc 2):\n", 0, 0, 2);
+	_gg_escribir("Esperant 10 segons...\n", 0, 0, 2);
+	
+	// Fem un compte enrere visible per demostrar que l'altre procés està esperant
+	int i;
+	for (i=0; i<10; i++) {
+		_gg_escribir(".", 0, 0, 2); 
+		int tics = _gd_tickCount + 60; 
+		while(_gd_tickCount < tics) _gp_WaitForVBlank();
+	}
+	
+	_gg_escribir("ENVIANT '999' a MB0!\n", 0, 0, 2);
+	
+	// Enviem la dada. Això hauria de despertar al consumidor immediatament.
+	_ga_send(0, 999);
+	
+	_gg_escribir("Dada enviada. Adeu.\n", 0, 0, 2);
+	while(1) _gp_WaitForVBlank();
+}
+
+
+/* función para escribir los porcentajes de uso de la CPU */
 void porcentajeUso()
 {
 	if (_gd_sincMain & 1)			// verificar sincronismo de timer0
@@ -33,15 +76,13 @@ void porcentajeUso()
 
 
 /* Inicializaciones generales del sistema Garlic */
-//------------------------------------------------------------------------------
 void inicializarSistema() {
-//------------------------------------------------------------------------------
-	_gg_iniGrafA();			// inicializar procesadores gráficos
+	_gg_iniGrafA();			
 	_gs_iniGrafB();
 	_gs_dibujarTabla();
 
-	_gd_seed = *punixTime;	// inicializar semilla para números aleatorios con
-	_gd_seed <<= 16;		// el valor de tiempo real UNIX, desplazado 16 bits
+	_gd_seed = *punixTime;	
+	_gd_seed <<= 16;		
 	
 	_gd_pcbs[0].keyName = 0x4C524147;		// "GARL"
 	
@@ -50,33 +91,36 @@ void inicializarSistema() {
 		exit(0);
 	}
 
-	irqInitHandler(_gp_IntrMain);	// instalar rutina principal interrupciones
-	irqSet(IRQ_VBLANK, _gp_rsiVBL);	// instalar RSI de vertical Blank
-	irqEnable(IRQ_VBLANK);			// activar interrupciones de vertical Blank
+	irqInitHandler(_gp_IntrMain);	
+	irqSet(IRQ_VBLANK, _gp_rsiVBL);	
+	irqEnable(IRQ_VBLANK);			
 
 	irqSet(IRQ_TIMER0, _gp_rsiTIMER0);
-	irqEnable(IRQ_TIMER0);				// instalar la RSI para el TIMER0
+	irqEnable(IRQ_TIMER0);				
 	TIMER0_DATA = divFreq0; 
-	TIMER0_CR = 0xC3;  	// Timer Start | IRQ Enabled | Prescaler 3 (F/1024)
+	TIMER0_CR = 0xC3;  	
 	
-	REG_IME = IME_ENABLE;			// activar las interrupciones en general
+	REG_IME = IME_ENABLE;			
 }
 
 
-//------------------------------------------------------------------------------
+
 int main(int argc, char **argv) {
-//------------------------------------------------------------------------------
+
 	intFunc start;
 	int mtics, v;
 
 	inicializarSistema();
 	
 	_gg_escribir("********************************", 0, 0, 0);
-	_gg_escribir("*                              *", 0, 0, 0);
+	_gg_escribir("* *", 0, 0, 0);
 	_gg_escribir("* Sistema Operativo GARLIC 2.0 *", 0, 0, 0);
-	_gg_escribir("*                              *", 0, 0, 0);
+	_gg_escribir("* *", 0, 0, 0);
 	_gg_escribir("********************************", 0, 0, 0);
 	_gg_escribir("*** Inicio fase 2_P\n", 0, 0, 0);
+	
+	
+	// TEST HOLA
 	
 	_gg_escribir("*** Carga de programa HOLA.elf\n", 0, 0, 0);
 	start = _gm_cargarPrograma("HOLA");
@@ -114,6 +158,9 @@ int main(int argc, char **argv) {
 		_gg_escribir("*** Programa NO cargado\n", 0, 0, 0);
 
 
+	
+	// TEST PONG
+	
 	_gg_escribir("*** Carga de programa PONG.elf\n", 0, 0, 0);
 	start = _gm_cargarPrograma("PONG");
 	if (start)
@@ -147,11 +194,31 @@ int main(int argc, char **argv) {
 		_gg_escribir("*** Programa NO cargado\n", 0, 0, 0);
 
 
+
+	// TEST BÚSTIES
+	
+	_gg_escribir("\n*** INICI TEST BUSTIES (Bloqueig)\n", 0, 0, 0);
+	
+	// Netejem finestres
+	_gs_borrarVentana(1, 0);
+	_gs_borrarVentana(2, 0);
+	_gs_borrarVentana(3, 0);	
+
+	// Creem el CONSUMIDOR al Sòcol 1
+	_gp_crearProc((intFunc)aux_consumidor, 1, "CONS", 0);
+	
+	// Creem el PRODUCTOR al Sòcol 2
+	_gp_crearProc((intFunc)aux_productor, 2, "PROD", 0);
+	
+	_gg_escribir("Processos creats. Observa el bloqueig.\n", 0, 0, 0);
+
 	_gg_escribir("*** Final fase 2_P\n", 0, 0, 0);
 	_gs_dibujarTabla();
 
 	while(1) {
 		_gp_WaitForVBlank();
-	}							// parar el procesador en un bucle infinito
+		// Seguirem mostrant els percentatges mentre corre el test de bústies
+		porcentajeUso();
+	}
 	return 0;
 }
