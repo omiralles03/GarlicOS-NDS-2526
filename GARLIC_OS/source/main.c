@@ -347,7 +347,7 @@ void test4_MMLL(){
 		} else {
 			_gg_escribir("ERROR: En carrega MMLL (Iter %d)\n", i, 0, 0);
 		}
-		esperaSegundos(1); //visual
+		esperaSegundos(3); //visual
 	}
 	_gg_escribir("MMLL Test COMPLETED.\n", 0, 0, 0);
 
@@ -356,7 +356,8 @@ void test4_MMLL(){
 /* Saturació memòria*/
 void test5_MemoriaFull()
 {
-	char *relleno = "PONG";  
+	//PONG
+	char *relleno = "DESC";  
 	char *grande = "LABE";   // Programa amb 2 segments (Code+Data)
 	intFunc start;
 	int i;
@@ -365,9 +366,9 @@ void test5_MemoriaFull()
 	_gg_escribir("\n** TEST 5: ESTRES DE MEMORIA **\n", 0, 0, 0);
 	_gg_escribir("(Emplenant memòria fins al max...)\n", 0, 0, 0);
 
-	// Llenamos los zócalos 1 al 12 con PONG
+	// Llenamos los zócalos 1 al 4 con DESC
 	// Nota: Nomès _gm_cargarPrograma, NO creo proces
-	for (i = 1; i <= 12; i++) {
+	for (i = 1; i <= 4; i++) {
 		start = _gm_cargarPrograma(i, relleno);
 		if (start) {
 			cargados++;
@@ -376,7 +377,7 @@ void test5_MemoriaFull()
 			break; // Memoria llena antes de lo previsto
 		}
 	}
-	_gg_escribir("S'han carregat %d copias de PONG.\n", cargados, 0, 0);
+	_gg_escribir("S'han carregat %d copias de DESC.\n", cargados, 0, 0);
 
 	esperaSegundos(2);
 	
@@ -422,8 +423,11 @@ int main(int argc, char **argv) {
 			if(test2()){
 				esperaSegundos(2);
 				
-				//eliminaProcs(); // Borrar LABE/DESC/PONG
+				
 				test3(); //Execució TADD per provar les addicionals
+				_gg_escribir("\nNetejant pel TADD...\n", 0, 0, 0);
+				esperaSegundos(1);
+				eliminaProcs(); // Borrar LABE/DESC/PONG
 				
 				esperaSegundos(1);
 				_gg_escribir("Preparant execució MMLL\n", 0, 0, 0);
@@ -431,6 +435,7 @@ int main(int argc, char **argv) {
 				
 				esperaSegundos(1);
 				_gg_escribir("\nNetejant per STRESS test...\n", 0, 0, 0);
+				esperaSegundos(1);
 				//eliminaProcs();	
 				test5_MemoriaFull();
 				
