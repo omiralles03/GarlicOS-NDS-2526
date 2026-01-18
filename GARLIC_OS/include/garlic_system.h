@@ -181,7 +181,7 @@ extern int _gm_listaProgs(char* progs[]);
 					los segmentos de programa a partir de una posici?n de
 					memoria libre, efectuando la reubicaci?n de las referencias
 					a los s?mbolos del programa seg?n el desplazamiento del
-					c?digo y los datos en la memoria destino;
+					código en la memoria destino;
 	Par?metros:
 		zocalo	->	?ndice del z?calo que indexar? el proceso del programa
 		keyName ->	string de 4 car?cteres con el nombre en clave del programa
@@ -436,11 +436,15 @@ extern void _gi_controlInterfaz(int key);
 #define MAILBOX_QUEUE_SIZE 16 // Mida de la cua de cada bústia
 
 // Estructura d'una bústia (Mailbox)
-typedef struct {
-  int queue[MAILBOX_QUEUE_SIZE]; // Cua de dades
-  int head;                      // Índex principi cua
-  int tail;                      // Índex final cua
-  int count;                     // Nombre de dades a la cua
+typedef struct
+{
+	int queue[MAILBOX_QUEUE_SIZE];	// Cua de dades 
+	int head;						// Índex principi cua
+	int tail;						// Índex final cua
+	int count;						// Nombre de dades a la cua
+	// VARIABLES ADDICIONALS PER FASE 2
+	char pWaiting[16];				// Cua de processos esperant (sòcols)
+	int nWaiting;					// Comptador de processos a la cua
 } PACKED garlicMailbox;
 
 // Vector global per a les 8 bústies

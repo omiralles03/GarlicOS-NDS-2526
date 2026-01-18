@@ -1,6 +1,6 @@
 /*------------------------------------------------------------------------------
 
-	"main.c" : fase 2 / ProgG i ProgM
+	"main.c" : fase 2 / ProgG i ProgM i progP
 
 	Programa de control del sistema operativo GARLIC, versión 2.0
 
@@ -8,19 +8,19 @@
 #include <nds.h>
 #include <stdlib.h>
 
-
 #include "garlic_system.h"	// definición de funciones y variables de sistema
 
 extern int * punixTime;		// puntero a zona de memoria con el tiempo real
 
+const short divFreq0 = -33513982/1024;		// frecuencia de TIMER0 = 1 Hz
 const short divFreq2 = -33513982/(1024*4);	// frecuencia de TIMER2 = 4 Hz
 const short divFreq1 = -33513982/(1024*7);		// frecuencia de TIMER1 = 7 Hz
 
-const char *argumentosDisponibles[7] = { "0", "1", "2", "3", "5", "6", "7"};
+const char *argumentosDisponibles[4] = { "0", "1", "2", "3"};
 		// se supone que estos programas están disponibles en el directorio
 		// "Programas" de las estructura de ficheros de Nitrofiles
-const char *progs[6] = {"BORR","CRON","HOLA","PONG","PRNT","DNIF",};
-const unsigned char num_progs = 6;
+const char *progs[9] = {"BORR", "LABE", "CRON","HOLA","PONG","PRNT","DNIF", "TSP1", "TDVD"};
+const unsigned char num_progs = 9;
 
 
 /* Función para presentar una lista de opciones y escoger una: devuelve el índice de la opción
@@ -69,127 +69,32 @@ unsigned char escogerOpcion(char *opciones[], unsigned char num_opciones)
 }
 
 
-//------------------------------------------------------------------------------
-// JOC DE PROVES PROG G - SPRITES
-//------------------------------------------------------------------------------
-
-// Crea un Sprite a unes coordenades x,y
-void prova_estatica(int z)
- {
-	unsigned char n, icon;
-	short px, py;
-	
-	n = 0; icon =0; px = 112; py = 80; // centre
-	_gg_spriteSet(n, icon, z);
-	_gg_spriteMove(n, px, py, z);
-	_gg_spriteShow(n, z);
-
-	n = 1; icon =9; px = -16; py = -16; // superior esquerra
-	_gg_spriteSet(n, icon, z);
-	_gg_spriteMove(n, px, py, z);
-	_gg_spriteShow(n, z);
- }
- 
- void prova_estatica2(int z)
- {
-	unsigned char n;
-	
-	n = 0;// centre
-	_gg_spriteHide(n, z);
-
-	n = 1; // superior esquerra
-	_gg_spriteHide(n, z);
- }
- 
- void prova_dvd(int z) {
- 
- 	short maxX = 256 - 32;
-	short maxY = 192 - 32;
-	short minX = 0;
-	short minY = 0;
-	short dirX = 50;
-	short dirY = 25;
-	
-	unsigned char n, icon;
-	short px, py;
- 
-	n = 6; icon = 3; px = minX; py = minY;
-	_gg_spriteSet(n, icon, z);
-	_gg_spriteMove(n, px, py, z);
-	_gg_spriteShow(n, z);
-	
- 	for (int i = 0; i < 200; i++) {
-		// VENTANA
-		px += dirX;
-		py += dirY;
-		
-		if (px >= maxX) {
-			px = maxX;
-			dirX = -dirX;
-		} else if (px <= minX) {
-			px = minX;
-			dirX = -dirX;
-		}
-		
-		if (py >= maxY) {
-			py = maxY;
-			dirY = -dirY;
-		} else if (py <= minY) {
-			py = minY;
-			dirY = -dirY;
-		}
-		_gg_spriteMove(n, px, py, z);
-		_gg_escribir("\n%0Sprite[%d,%d]\n", px, py, 4);
-	}
- }
-
 /* Función para permitir seleccionar un programa entre los ficheros ELF
 		disponibles, así como un argumento para el programa (0, 1, 2 o 3) */
 void seleccionarPrograma()
 {
 	intFunc start;
-	int ind_prog, argumento, i;
-
-	i = 1;
-	while ((i < 16) &&	(_gd_pcbs[i].PID == 0))	// buscar si hay otro proceso en marcha
-	{
-		i++;
-	}
-	if (i < 16)						// en caso de encontrar otro proceso activo
-	{
-		_gd_pcbs[i].PID = 0;		// liberar su PCB
-		_gd_nReady = 0;				// eliminar cualquier proceso de cola de READY
-		_gg_escribir("* %3%d%0: proceso destruido\n", i, 0, 0);
-		_gg_escribirLineaTabla(i, (i == _gi_za ? 2 : 3));
-		if (i != _gi_za)			// si no se trata del propio zócalo actual
-			_gg_generarMarco(i, 3);
-	}
+	int ind_prog, argumento;
+	
+	_gp_matarProc(_gi_za);
+	_gd_wbfs[_gi_za].pControl = 0;
+	_gg_escribir("%3* %d: proceso destruido\n", _gi_za, 0, 0);
+	_gg_escribirLineaTabla(_gi_za, 3);
+		
 	_gs_borrarVentana(_gi_za, 1);
 	_gg_escribir("%1*** Seleccionar programa :\n", 0, 0, _gi_za);
 	ind_prog = escogerOpcion((char **) progs, num_progs);
 	_gg_escribir("%1*** seleccionar argumento :\n", 0, 0, _gi_za);
-	argumento = escogerOpcion((char **) argumentosDisponibles, 7);
-
-	switch (argumento) {
-	  case 5-1:
-		prova_estatica(_gi_za);
-		break;
-	  case 6-1:
-	    prova_estatica2(_gi_za);
-		break;
-	  case 7-1:
-	    prova_dvd(_gi_za);
-		break;
-	  default:
-		start = _gm_cargarPrograma(_gi_za, (char *) progs[ind_prog]);
-		if (start)
-		{
-			_gp_crearProc(start, _gi_za, (char *) progs[ind_prog], argumento);
-			_gg_escribir("%2* %d:%s.elf", _gi_za, (unsigned int) progs[ind_prog], 0);
-			_gg_escribir(" (%d)\n", argumento, 0, 0);
-			_gg_escribirLineaTabla(_gi_za, 2);
-		}
-		break;
+	argumento = escogerOpcion((char **) argumentosDisponibles, 4);
+	_gs_borrarVentana(_gi_za, 1);
+	
+	start = _gm_cargarPrograma(_gi_za, (char *) progs[ind_prog]);
+	if (start)
+	{
+		_gp_crearProc(start, _gi_za, (char *) progs[ind_prog], argumento);
+		_gg_escribir("%2* %d:%s.elf", _gi_za, (unsigned int) progs[ind_prog], 0);
+		_gg_escribir(" (%d)\n", argumento, 0, 0);
+		_gg_escribirLineaTabla(_gi_za, 2);
 	}
 }
 
@@ -213,8 +118,6 @@ void gestionSincronismos()
 			if (_gd_sincMain & mask)
 			{	// actualizar visualización de tabla de zócalos
 				_gg_escribirLineaTabla(i, (i == _gi_za ? 2 : 3));
-				if (i != _gi_za)			// si no se trata del propio zócalo actual
-					_gg_generarMarco(i, 3);
 				_gg_escribir("%3* %d: proceso terminado\n", i, 0, 0);
 				_gd_sincMain &= ~mask;		// poner bit a cero
 			}
@@ -229,15 +132,15 @@ void gestionSincronismos()
 //------------------------------------------------------------------------------
 void inicializarSistema() {
 //------------------------------------------------------------------------------
-
-	_gd_seed = *punixTime;	// inicializar semilla para números aleatorios con
-	_gd_seed <<= 16;		// el valor de tiempo real UNIX, desplazado 16 bits
-	
-	_gd_pcbs[0].keyName = 0x4C524147;	// "GARL"
 	
 	_gg_iniGrafA();					// inicializar gráficos
 	_gs_iniGrafB();
 	_gs_dibujarTabla();
+	
+	_gd_seed = *punixTime;	// inicializar semilla para números aleatorios con
+	_gd_seed <<= 16;		// el valor de tiempo real UNIX, desplazado 16 bits
+	
+	_gd_pcbs[0].keyName = 0x4C524147;	// "GARL"
 	
 	_gi_redibujarZocalo(1);			// marca tabla de zócalos con el proceso
 									// del S.O. seleccionado (en verde)
@@ -250,6 +153,11 @@ void inicializarSistema() {
 	irqInitHandler(_gp_IntrMain);	// instalar rutina principal interrupciones
 	irqSet(IRQ_VBLANK, _gp_rsiVBL);	// instalar RSI de vertical Blank
 	irqEnable(IRQ_VBLANK);			// activar interrupciones de vertical Blank
+	
+	irqSet(IRQ_TIMER0, _gp_rsiTIMER0);
+	irqEnable(IRQ_TIMER0);			// RSI TIMER 0	
+	TIMER0_DATA = divFreq0; 
+	TIMER0_CR = 0xC3;  
 
 	irqSet(IRQ_TIMER1, _gm_rsiTIMER1);
 	irqEnable(IRQ_TIMER1);				// instalar la RSI para el TIMER1
@@ -281,7 +189,7 @@ int main(int argc, char **argv) {
 	_gg_escribir("%1* Sistema Operativo GARLIC 2.0 *", 0, 0, 0);
 	_gg_escribir("%1*                              *", 0, 0, 0);
 	_gg_escribir("%1********************************", 0, 0, 0);
-	_gg_escribir("%1*** Inicio fase 2 / ProgG i ProgM\n", 0, 0, 0);
+	_gg_escribir("%1*** Inicio fase 2 / Master\n", 0, 0, 0);
 
 	while (1)						// bucle infinito
 	{
@@ -295,5 +203,5 @@ int main(int argc, char **argv) {
 		gestionSincronismos();
 		_gp_WaitForVBlank();		// retardo del proceso de sistema
 	}
-	return 0;			
+	return 0;
 }

@@ -190,7 +190,7 @@ _gg_escribirLineaTabla:
                 mov r3, r5              @; Color
                 bl _gs_escribirStringSub
                 add sp, #8              @; Alliberar espai reservat
-
+				
                 add r0, r8, #16         @; R0 = dir. keyName a _gd_pcbs offset 16
                 add r1, r4, #4          @; Fila = z + 4 
                 mov r2, #9              @; Columna del keyName

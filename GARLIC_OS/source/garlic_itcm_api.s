@@ -126,7 +126,7 @@ _ga_printf:
 	push {r4, lr}
 	ldr r4, =_gd_pidz		@; R4 = dirección _gd_pidz
 	ldr r3, [r4]
-	and r3, #0xf			@; R3 = ventana de salida (zócalo actual MOD 16)
+	and r3, #0xF			@; R3 = ventana de salida (zócalo actual MOD 4)
 	bl _gg_escribir
 	pop {r4, pc}
 
@@ -182,7 +182,7 @@ _ga_delay:
 .Ldelay1:
 	cmp r0, #600
 	movhi r0, #600			@; limitar el n?mero de segundos a 600 (10 minutos)
-	@;bl _gp_retardarProc
+	bl _gp_retardarProc
 .Ldelay2:
 	pop {r2-r3, pc}
 
