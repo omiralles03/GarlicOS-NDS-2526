@@ -87,7 +87,7 @@ typedef struct {
   unsigned char icon;    // Icona (0-63)
   unsigned char zocalo;  // Zocalo (0-15)
   unsigned char n;       // Numero sprite (0-7)
-  unsigned char visible; // Estat (0: ocult, 1: visible)
+  unsigned int visible; // Estat (0: ocult, 1: visible)
   short px;              // Posicio X relativa (-32 a 256)
   short py;              // Posicio Y relativa (-32 a 192)
 
@@ -268,6 +268,7 @@ extern void _gg_spriteShow(unsigned char n, unsigned char zocalo);
 extern void _gg_spriteHide(unsigned char n, unsigned char zocalo);
 extern void _gg_actualiza_sprites();
 extern void _gg_clearScreen(unsigned char zocalo);
+extern void _gg_ocultar_sprites_OAM();
 //------------------------------------------------------------------------------
 //	Rutinas de soporte a la gestión de gráficos (garlic_itcm_graf.s)
 //------------------------------------------------------------------------------
@@ -395,6 +396,14 @@ extern void _gs_representarPilas();
 //	Rutinas de soporte a la interficie de usuario (garlic_itcm_ui.s)
 //------------------------------------------------------------------------------
 extern int _gi_za; // z?calo seleccionado actualmente
+extern short _gi_nFrames;   // número de frames de la animación
+extern short _gi_orgX;      // origen X de los fondos
+extern short _gi_orgY;      // origen Y de los fondos
+extern short _gi_zoom;      // zoom de los fondos
+extern short _gi_vvis;      // ventanas visibles (màscara de bits)
+
+// També necessitaràs aquesta funció que sol estar a l'UI:
+extern int _gi_ventanaVisible(int v);
 
 /* _gi_movimientoVentanas:	actualiza el desplazamiento y escalado de los
                                 fondos 2 y 3 del procesador gr?fico A, para
