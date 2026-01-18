@@ -1,6 +1,6 @@
 /*------------------------------------------------------------------------------
 
-	"main.c" : fase 2 / ProgG
+	"main.c" : fase 2 / ProgG i ProgM
 
 	Programa de control del sistema operativo GARLIC, versión 2.0
 
@@ -8,11 +8,13 @@
 #include <nds.h>
 #include <stdlib.h>
 
+
 #include "garlic_system.h"	// definición de funciones y variables de sistema
 
 extern int * punixTime;		// puntero a zona de memoria con el tiempo real
 
 const short divFreq2 = -33513982/(1024*4);	// frecuencia de TIMER2 = 4 Hz
+const short divFreq1 = -33513982/(1024*7);		// frecuencia de TIMER1 = 7 Hz
 
 const char *argumentosDisponibles[7] = { "0", "1", "2", "3", "5", "6", "7"};
 		// se supone que estos programas están disponibles en el directorio
@@ -179,7 +181,7 @@ void seleccionarPrograma()
 	    prova_dvd(_gi_za);
 		break;
 	  default:
-		start = _gm_cargarPrograma((char *) progs[ind_prog]);
+		start = _gm_cargarPrograma(_gi_za, (char *) progs[ind_prog]);
 		if (start)
 		{
 			_gp_crearProc(start, _gi_za, (char *) progs[ind_prog], argumento);
@@ -249,6 +251,11 @@ void inicializarSistema() {
 	irqSet(IRQ_VBLANK, _gp_rsiVBL);	// instalar RSI de vertical Blank
 	irqEnable(IRQ_VBLANK);			// activar interrupciones de vertical Blank
 
+	irqSet(IRQ_TIMER1, _gm_rsiTIMER1);
+	irqEnable(IRQ_TIMER1);				// instalar la RSI para el TIMER1
+	TIMER1_DATA = divFreq1; 
+	TIMER1_CR = 0xC3;  	// Timer Start | IRQ Enabled | Prescaler 3 (F/1024)
+	
 	irqSet(IRQ_TIMER2, _gg_rsiTIMER2);
 	irqEnable(IRQ_TIMER2);			// instalar la RSI para el TIMER2
 	TIMER2_DATA = divFreq2; 
@@ -274,7 +281,7 @@ int main(int argc, char **argv) {
 	_gg_escribir("%1* Sistema Operativo GARLIC 2.0 *", 0, 0, 0);
 	_gg_escribir("%1*                              *", 0, 0, 0);
 	_gg_escribir("%1********************************", 0, 0, 0);
-	_gg_escribir("%1*** Inicio fase 2 / ProgG\n", 0, 0, 0);
+	_gg_escribir("%1*** Inicio fase 2 / ProgG i ProgM\n", 0, 0, 0);
 
 	while (1)						// bucle infinito
 	{
@@ -286,8 +293,6 @@ int main(int argc, char **argv) {
 				seleccionarPrograma();
 		}
 		gestionSincronismos();
-		//_gg_escribir("\n%1Ventana[5]: %d\n", _gi_ventanaVisible(5), 0, _gi_za);
-		//_gg_escribir("\n%1SPRITES[%d]: %d\n", _gd_sprites[5*8].zocalo, _gd_sprites[5*8].visible, _gi_za);
 		_gp_WaitForVBlank();		// retardo del proceso de sistema
 	}
 	return 0;			

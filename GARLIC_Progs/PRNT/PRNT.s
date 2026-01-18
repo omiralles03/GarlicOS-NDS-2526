@@ -128,7 +128,7 @@ frases:
 	.word	.LC14
 	.align	2
 .LC15:
-	.ascii	"-- Programa PRTF  -  PID (%d) --\012\000"
+	.ascii	"-- Programa PRNT  -  PID (%d) --\012\000"
 	.align	2
 .LC16:
 	.ascii	"\012Prueba juego de caracteres:\012\000"

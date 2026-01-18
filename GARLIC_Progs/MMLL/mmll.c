@@ -44,15 +44,15 @@ int _start(int arg)				/* funció d'inicio: no se usa 'main' */
 	else if (arg > 3) arg = 3;
 	num_elements = _power100(arg + 1); //mida llista
 
-	GARLIC_printf("-- Programa MMLL - PID (%d) --\n", pid);
+	GARLIC_printf("-- Programa MMLL - PID (%d) --\n", pid, 0, 0);
 	//Mostrar mida.
-	GARLIC_printf("Generant 100^%d elements...\n", arg + 1);
+	GARLIC_printf("Generant 100^%d elements...\n", arg + 1, 0, 0);
 
 	//Generació primer num i min/max
 	if (num_elements > 0) {
 		min_val = max_val = _GARLIC_random64();
 	} else {
-        GARLIC_printf("Nombre d'elements 0. No es pot calcular min/max.\n");
+        GARLIC_printf("Nombre d'elements 0. No es pot calcular min/max.\n", 0, 0, 0);
         return 0; // No hi ha res a fer si la llista és buida
     }
 
@@ -75,10 +75,10 @@ int _start(int arg)				/* funció d'inicio: no se usa 'main' */
 	unsigned int max_alta = (unsigned int)(max_val >> 32);
 	unsigned int max_baixa = (unsigned int)(max_val & 0xFFFFFFFF);
 
-	GARLIC_printf("Calcul finalitzat.\n");
-	GARLIC_printf("Minim: %x%x (Hex Alta, Baixa)\n", min_alta, min_baixa);
-	GARLIC_printf("Maxim: %x%x (Hex Alta, Baixa)\n", max_alta, max_baixa);
+	GARLIC_printf("Calcul finalitzat.\n", 0, 0, 0);
+	GARLIC_printf("Minim: %x%x (Hex Alta, Baixa)\n", min_alta, min_baixa, 0);
+	GARLIC_printf("Maxim: %x%x (Hex Alta, Baixa)\n", max_alta, max_baixa, 0);
 
-	GARLIC_printf("-- Fi Programa MMLL - PID (%d) --\n", pid);
+	GARLIC_printf("-- Fi Programa MMLL - PID (%d) --\n", pid, 0, 0);
 	return 0;
 }

@@ -9,91 +9,96 @@
 
 #include <GARLIC_API.h>	
 
-int _start(int arg)
-{
-	int num_errors = 0;	//contador errors
-	void *p[5]; // Array per guardar fins a 5 punters (l'últim ha de fallar)
-	int i;
-	int pid = GARLIC_pid(); // Obtenim el PID per als missatges
+void mi_delay(int segundos) {
+    int frames = segundos * 60; // 60 frames por segundo
+    while (frames > 0) {
+        GARLIC_delay(0); // Espera 1 frame (aprox 16ms) y cede CPU
+        frames--;
+    }
+}
 
-	GARLIC_printf("-- Programa TADD - PID (%d) --\n", pid);
-	GARLIC_printf("Prova GARLIC_malloc()\n");
+int _start(int arg) {
+	void *p1, *p2, *p3, *p4, *p_fail;	
+	int res;
+	int res2;
 
-	//Intent de reservar 4 blocs de diferents mides
-	for (i = 0; i < 4; i++) {
-		int mida = (i + 1) * 10; // Reservem 10, 20, 30, 40 bytes
-		p[i] = GARLIC_malloc(mida);
-		if (p[i] != 0) {
-			GARLIC_printf("  Bloc %d (%d bytes) reservat a: %x\n", i, mida, (unsigned int)p[i]);
-			// Prova escritura
-			*((char*)p[i]) = (char)('A' + i);
-		} else {
-			GARLIC_printf("ERROR: No s'ha pogut reservar el bloc %d (%d bytes)\n", i, mida);
-			num_errors+=1;
-		}
-	}
+	GARLIC_printf("[TADD %d] TEST MEMORIA DINAMICA\n", 0, 0, 0);
+	
+	// -------------------------------------------------------------
+    // TEST VISUAL: Bloc Gran
+    // -------------------------------------------------------------
+    // 320 bytes / 32 = 10 franges.
+    GARLIC_printf("Reserva Gran (10 franges)\n", 0, 0, 0);
+    p1 = GARLIC_malloc(320);
+	
+	if(p1) GARLIC_printf("- p1(64B): OK en %x\n", p1, 0, 0);
+	else GARLIC_printf("- p1 (64B): ERROR\n", 0, 0, 0);
+	
+	//GARLIC_delay(2); DECISION TO MAKE THE "MANUAL" DELAY BECAUSE OF PROGP 
+		//DEPENDENCIES
+	mi_delay(2);
+	
+	// -------------------------------------------------------------
+    // TEST LIMIT: 4 slots pel proces
+    // -------------------------------------------------------------
+	GARLIC_printf("Emplenant slots (max 4)\n", 0, 0, 0);
+    p2 = GARLIC_malloc(32); // Slot 2
+    p3 = GARLIC_malloc(32); // Slot 3
+    p4 = GARLIC_malloc(32); // Slot 4
+	
+	if(p2 && p3 && p4) GARLIC_printf("-OK: 4 blocs reservats\n", 0, 0, 0);
+	else GARLIC_printf("-ERROR: en reserva 4 slots\n", 0, 0, 0);
+ 
+	
+	mi_delay(2);
+	
+	//Intentar reserva 5è
+	GARLIC_printf("Intent 5o bloc...\n", 0, 0, 0);
+    p_fail = GARLIC_malloc(32);
+	
+	if(p_fail == 0) GARLIC_printf(" -> OK: Bloquejat (retorno 0)\n", 0, 0, 0);
+    else GARLIC_printf(" -> FAIL: S'ha permes la 5a reserva\n", 0, 0, 0);
+	
+	mi_delay(2);
 
-	//Intent reservar un cinquè bloc (hauria de fallar)
-	GARLIC_printf("Intent reservar 5è bloc\n");
-	p[4] = GARLIC_malloc(50);
-	if (p[4] == 0) {
-		GARLIC_printf("  OK: El 5è malloc ha retornat 0 com s'esperava.\n");
-	} else {
-		GARLIC_printf("  ERROR: El 5è malloc ha retornat un punter (%x)! No hauria de poder.\n", (unsigned int)p[4]);
-		num_errors+=1;
-		// Si per error s'ha reservat, l'alliberem
-		GARLIC_free(p[4]);
-	}
+	// -------------------------------------------------------------
+    // TEST FREE ERRONI
+    // -------------------------------------------------------------
+	GARLIC_printf("Test Free Invalid\n", 0, 0, 0);
+    // Intent de lliberar una direcció random (ej: 0xDEADBEEF)
+    res = GARLIC_free((void*)0xDEADBEEF);
+	
+	if(res == 0) GARLIC_printf(" -> OK: Detectado ptr invalid\n", 0, 0, 0);
+    else GARLIC_printf(" -> FAIL: Free ha acceptat brossa\n", 0, 0, 0);
+	
+	mi_delay(2);
+	
+	// -------------------------------------------------------------
+    // TEST FRAGMENTACION (Huecos)
+    // -------------------------------------------------------------
+	GARLIC_printf("Test Huecos (Llibero P2)\n", 0, 0, 0);
+	
+    res2 = GARLIC_free(p3); // deixar hueco entre P2 y P4
+    if(res2 == 0) GARLIC_printf(" -> FAIL: No s'ha esborrat\n", 0, 0, 0);
+    else if(res2 == 1) GARLIC_printf(" -> OK: Free ha acceptat correctament\n", 0, 0, 0);
+	
+    mi_delay(2); // per veure hueco a pantalla
 
-	//Intentar alliberar un bloc
-	GARLIC_printf("Prova GARLIC_free() bloc 1 (%x)\n", (unsigned int)p[1]);
-	if (p[1] != 0) {
-		int resultat_free = GARLIC_free(p[1]);
-		if (resultat_free != 0) {
-			GARLIC_printf("OK: Bloc 1 alliberat correctament.\n");
-			p[1] = 0; // Marquem el punter com a alliberat
-		} else {
-			GARLIC_printf("ERROR: GARLIC_free() ha fallat per al bloc 1.\n");
-			num_errors+=1;
-		}
-	} else {
-		GARLIC_printf("INFO: Bloc 1 no estava reservat, no es pot alliberar.\n");
-	}
+    GARLIC_printf(" Emplenant hueco...\n", 0, 0, 0);
+    p3 = GARLIC_malloc(32); 
+    if(p3) GARLIC_printf(" -> Re-reservt en %x\n", p3, 0, 0);
 
-	//Intent reservar un altre bloc
-	GARLIC_printf("Intentant reservar un nou bloc (ara hauria de funcionar)...\n");
-	p[4] = GARLIC_malloc(15); //nou bloc
-	if (p[4] != 0) {
-		GARLIC_printf("OK: Nou bloc reservat a: %x\n", (unsigned int)p[4]);
-		*((char*)p[4]) = 'Z'; //prova escriptura
-	} else {
-		GARLIC_printf("ERROR: No s'ha pogut reservar el nou bloc després de free.\n");
-		num_errors+=1;
-	}
-
-	//Intent alliberar un punter invàlid (adreça random)
-	GARLIC_printf("Intentant alliberar punter invàlid (0x1234)...\n");
-	int resultat_free_invalid = GARLIC_free((void *)0x1234);
-	if (resultat_free_invalid == 0) {
-		GARLIC_printf("OK: GARLIC_free() ha retornat 0 per a punter invàlid.\n");
-	} else {
-		GARLIC_printf("ERROR: GARLIC_free() no ha detectat un punter invàlid.\n");
-		num_errors+=1;
-	}
-
-	//Alliberar la resta de blocs
-	GARLIC_printf("Alliberar la resta de blocs\n");
-	for (i = 0; i < 5; i++) {
-		if (p[i] != 0) { // Alliberem només els que no hem alliberat abans
-			if (GARLIC_free(p[i]) != 0) {
-				GARLIC_printf("Bloc a %x alliberat.\n", (unsigned int)p[i]);
-			} else {
-				GARLIC_printf("ERROR alliberant bloc a %x.\n", (unsigned int)p[i]);
-				num_errors+=1;
-			}
-		}
-	}
-
-	GARLIC_printf("-- Fi Programa TADD - PID (%d) --\n", pid);
-	return num_errors;
+    mi_delay(2);
+	
+	// -------------------------------------------------------------
+	//						NETEJA FINAL
+	// -------------------------------------------------------------
+	GARLIC_printf("Neteja final...\n", 0, 0, 0);
+    GARLIC_free(p1);
+    GARLIC_free(p2);
+    GARLIC_free(p3);
+    GARLIC_free(p4);
+	
+	GARLIC_printf("[TADD %d] END Test\n", 0, 0, 0);    
+	return 0;
 }

@@ -5,6 +5,7 @@
 @;
 @;==============================================================================
 
+IME = 0x4000208				@; Adreça del REG_IME
 .section .itcm,"ax",%progbits
 
 	.arm
@@ -385,18 +386,27 @@ _gp_crearProc:
 	@; de multiplexación de procesos no salve el estado del proceso terminado.
 _gp_terminarProc:
 	ldr r0, =_gd_pidz
-	ldr r1, [r0]					@; R1 = valor actual de PID + zócalo
-	and r1, r1, #0xf				@; R1 = zócalo del proceso desbancado
-	str r1, [r0]					@; guardar zócalo con PID = 0, para no salvar estado			
+	ldr r1, [r0]			@; R1 = valor actual de PID + z?calo
+	and r1, r1, #0xf		@; R1 = z?calo del proceso desbancado
+	bl _gp_inhibirIRQs
+	str r1, [r0]			@; guardar z?calo con PID = 0, para no salvar estado			
 	ldr r2, =_gd_pcbs
 	mov r10, #24
 	mul r11, r1, r10
-	add r2, r11						@; R2 = dirección base _gd_pcbs[zocalo]
+	add r2, r11				@; R2 = direcci?n base _gd_pcbs[zocalo]
 	mov r3, #0
-	str r3, [r2]					@; pone a 0 el campo PID del PCB del proceso
+	str r3, [r2]			@; pone a 0 el campo PID del PCB del proceso
+	str r3, [r2, #20]		@; borrar porcentaje de USO de la CPU
+	ldr r0, =_gd_sincMain
+	ldr r2, [r0]			@; R2 = valor actual de la variable de sincronismo
+	mov r3, #1
+	mov r3, r3, lsl r1		@; R3 = m?scara con bit correspondiente al z?calo
+	orr r2, r3
+	str r2, [r0]			@; actualizar variable de sincronismo
+	bl _gp_desinhibirIRQs
 .LterminarProc_inf:
-	bl _gp_WaitForVBlank			@; pausar procesador
-	b .LterminarProc_inf			@; hasta asegurar el cambio de contexto
+	bl _gp_WaitForVBlank	@; pausar procesador
+	b .LterminarProc_inf	@; hasta asegurar el cambio de contexto
 	
 	
 	.global _ga_send
@@ -495,7 +505,26 @@ _ga_receive:
 		.Lreceive_end:
 	pop {r4-r7, pc}
 			
+	.global _gp_inihibirIRQs
+	@; pone el bit IME (Interrupt Master Enable) a 0, para inhibir todas
+	@; las IRQs y evitar así posibles problemas debidos al cambio de contexto
+_gp_inhibirIRQs:
+	push {r0-r1, lr}
+		ldr r0, =IME			@; Carreguem l'adreça del IME
+		mov r1, #0				@; Carreguem un 0
+		str r1, [r0]			@; Guardem el 0 a l'adreça del IME
+	pop {r0-r1, pc}
 
+
+	.global _gp_desinihibirIRQs
+	@; pone el bit IME (Interrupt Master Enable) a 1, para desinhibir todas
+	@; las IRQs
+_gp_desinhibirIRQs:
+	push {r0-r1, lr}
+		ldr r0, =IME			@; Carreguem l'adreça del IME
+		mov r1, #1				@; Carreguem un 1
+		str r1, [r0]			@; Guardem el 1 a l'adreça del IME
+	pop {r0-r1, pc}
 	
 .end
 

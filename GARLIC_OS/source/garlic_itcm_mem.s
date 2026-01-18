@@ -1,9 +1,21 @@
 ﻿@;==============================================================================
 @;
 @;	"garlic_itcm_mem.s":	código de rutinas de soporte a la carga de
-@;							programas en memoria (version 1.0)
+@;							programas en memoria (version 2.0)
+@;	
+@;	Estudiant 1: arnau.faura@estudiants.urv.cat
 @;
 @;==============================================================================
+
+NUM_FRANJAS = 768
+INI_MEM_PROC = 0x01002000
+
+.section .dtcm,"wa",%progbits
+	.align 2
+
+	.global _gm_zocMem
+_gm_zocMem:	.space NUM_FRANJAS			@; vector de ocupaci�n de franjas mem.
+
 
 .section .itcm,"ax",%progbits
 
@@ -12,68 +24,379 @@
 
 
 	.global _gm_reubicar
-	@; rutina para interpretar los 'relocs' de un fichero ELF y ajustar las
+	@; rutina de soporte a _gm_cargarPrograma(), que interpreta los 'relocs'
+	@; de un fichero ELF, contenido en un buffer *fileBuf, y ajustar las
 	@; direcciones de memoria correspondientes a las referencias de tipo
-	@; R_ARM_ABS32, restando la dirección de inicio de segmento y sumando
-	@; la dirección de destino en la memoria;
+	@; R_ARM_ABS32, a partir de las direcciones de memoria destino de código
+	@; (dest_code) y datos (dest_data), y según el valor de las direcciones de
+	@; las referencias a reubicar y de las direcciones de inicio de los
+	@; segmentos de código (pAddr_code) y datos (pAddr_data)
 	@;Parámetros:
 	@; R0: dirección inicial del buffer de fichero (char *fileBuf)
-	@; R1: dirección de inicio de segmento (unsigned int pAddr)
-	@; R2: dirección de destino en la memoria (unsigned int *dest)
+	@; R1: dirección de inicio de segmento de código (unsigned int pAddr_code)
+	@; R2: dirección de destino en la memoria (unsigned int *dest_code)
+	@; R3: dirección de inicio de segmento de datos (unsigned int pAddr_data)
+	@; (pila): dirección de destino en la memoria (unsigned int *dest_data)
 	@;Resultado:
 	@; cambio de las direcciones de memoria que se tienen que ajustar
 _gm_reubicar:
-    push {r0-r10, lr}       
+    push {r0-r12, lr}
+    sub r2, r1                  @; R2 = off reubicació codi
+    ldr r12, [sp, #56]          @; dest_data
+    sub r12, r3                 @; R12 = off reubicació dades
 
-    mov r4, r0              @; r4 -> punter al buffer del fitxer
-    sub r5, r2, r1          @; r5 = offset de reubicació (nova_base - base_original)
+    ldr r4, [r0, #32]           @; e_shoff (taula seccions)
+    ldrh r10, [r0, #46]         @; e_shsize
+    ldrh r5, [r0, #48]          @; e_shnum
+    add r4, r0                  @; R4 = 1a secció
 
-    @; buscar la taula de seccions del .elf
-    ldr r7, [r4, #32]
-    add r7, r4, r7
-    ldrh r8, [r4, #48]
-    ldrh r9, [r4, #46]
+.LSeccionsLoop:
+    ldr r9, [r4, #4]            @; tipus secció
+    cmp r9, #9                  @; SHT_REL?
+    bne .LNoRelocacio
 
-.Lbucle_seccions:
-    cmp r8, #0
-    beq .Lfi_reubicacio
+    ldr r6, [r4, #16]           @; off secció
+    ldr r7, [r4, #20]           @; mida secció
+    ldr r8, [r4, #36]           @; mida entrada REL
+    add r6, r0                  @; inici REL
 
-    ldr r0, [r7, #4]
-    cmp r0, #9              @; seccio de reubicació (SHT_REL) ==? 9
-    bne .Lnext_seccio
+.LRelocLoop:
+    ldr r9, [r6, #4]            @; info reloc
+    and r9, #0xFF               @; tipus reloc
+    cmp r9, #2                  @; R_ARM_ABS32?
+    bne .LSeguentReloc
 
-    ldr r1, [r7, #16]
-    add r1, r4, r1
-    ldr r2, [r7, #20]
-    add r2, r1, r2
+    ldr r9, [r6]                @; off reubicació
+    add r9, r2                  @; aplicar off codi
+    ldr r1, [r9]                @; dir original
+    cmp r3, #0                  @; un sol segment?
+    addeq r1, r2                @; off codi
+    beq .LGuardarReloc
+    cmp r1, r3                  @; dir dades?
+    addlo r1, r2                @; off codi
+    addhs r1, r12               @; off dades
 
-.Lbucle_reubicadors:
-    cmp r1, r2
-    bge .Lnext_seccio
+.LGuardarReloc:
+    str r1, [r9]                @; escriure dir
 
-    ldr r3, [r1], #4
-    ldr r0, [r1], #4
+.LSeguentReloc:
+    sub r7, r8                  @; resta entrada
+    add r6, r8                  @; seguent REL
+    cmp r7, #0
+    bne .LRelocLoop
 
-    and r0, r0, #0xFF
-    cmp r0, #2              @; tipus R_ARM_ABS32 ?
-    bne .Lbucle_reubicadors
+.LNoRelocacio:
+    sub r5, #1                  @; --seccions
+    add r4, r10                 @; seguent secció
+    cmp r5, #0
+    bne .LSeccionsLoop
 
-    @; correcció de l'adreça
-    add r10, r3, r5         @; adreça real a modificar = (r_offset + offset)
-    ldr r0, [r10]
-    add r0, r0, r5          @; nou valor = (valor_original + offset)
-    str r0, [r10]
+    pop {r0-r12, pc}
 
-    b .Lbucle_reubicadors
+.global _gm_reservarMem
+	@; Rutina para reservar un conjunto de franjas de memoria libres
+	@; consecutivas que proporcionen un espacio suficiente para albergar
+	@; el tama�o de un segmento de c�digo o datos del proceso (seg�n indique
+	@; tipo_seg), asignado al n�mero de z�calo que se pasa por par�metro;
+	@; tambi�n se encargar� de invocar a la rutina _gm_pintarFranjas(), para
+	@; representar gr�ficamente la ocupaci�n de la memoria de procesos;
+	@; la rutina devuelve la primera direcci�n del espacio reservado; 
+	@; en el caso de que no quede un espacio de memoria consecutivo del
+	@; tama�o requerido, devuelve cero.
+	@;Par�metros
+	@;	R0: el n�mero de z�calo que reserva la memoria
+	@;	R1: el tama�o en bytes que se quiere reservar
+	@;	R2: el tipo de segmento reservado (0 -> c�digo, 1 -> datos)
+	@;Resultado
+	@;	R0: direcci�n inicial de memoria reservada (0 si no es posible)
+_gm_reservarMem:
+	push {r4- r9, lr}
 
-.Lnext_seccio:
-    add r7, r7, r9          @; seguent seccio
-    sub r8, r8, #1
-    b .Lbucle_seccions
+	@;calcul franges -> num_franges (sencer cap adalt) = (r1 + 31) / 32
+	add r4, r1, #31
+	mov r4, r4, lsr #5
+	
+	ldr r5, =_gm_zocMem
+	mov r6, #0			@; i, index actual 
+	mov r7, #0			@; comptador de franges consecutives lliures
+	
+.Lbuscar_franges:
+	cmp r6, #NUM_FRANJAS
+	bge .Lerror_reserva
+	
+	ldrb r8, [r5, r6]           
+    cmp r8, #0                  @; zócalo franja i =? lliure
+    beq .Lfranja_lliure
+    
+    mov r7, #0                  
+    add r6, #1					@;i+=1, buscar següent
+    b .Lbuscar_franges
+	
+.Lfranja_lliure:
+	add r7, #1
+    cmp r7, r4                  @;suficients franjes consecutives?
+    beq .Ltrobat
+    add r6, #1
+    b .Lbuscar_franges
 
-.Lfi_reubicacio:
-    pop {r0-r10, pc}
+.Ltrobat:
+	@;calcul index inicial lliure = index final trobat - franges necessaries + 1
+	sub r9, r6, r4
+	add r9, #1
+	
+	mov r1, #0					@; comptador
+
+.Lloop_marcar:
+	strb r0, [r5, r9]			@; _gm_zocMem[pos] = num_zocalo 
+	add r9, #1
+	add r1, #1
+	cmp r1, r4
+	blt .Lloop_marcar
+	
+	@; restaurar index_ini_lliure
+	sub r9, r9, r4
+	
+	@;pintar pantalla inferior
+	@;_gs_pintarFranjas(zocalo, index_ini, num_franjas, tipo_seg)
+	push {r0-r3}
+	mov r3, r2
+	mov r1, r9
+	mov r2, r4
+	
+	bl _gs_pintarFranjas
+	pop {r0-r3}
+	
+	@;calculo dir. retorno = INI_MEM_PROC + (index_ini * 32)
+	@; asegurant adreçes multiples de 4 per cada segment 
+	ldr r0, =INI_MEM_PROC
+	add r0, r0, r9, lsl #5
+	pop {r4-r9, pc}
+
+.Lerror_reserva:
+	mov r0, #0
+	pop {r4-r9, pc}
+	
 
 
+	.global _gm_liberarMem
+	@; Rutina para liberar todas las franjas de memoria asignadas al proceso
+	@; del z�calo indicado por par�metro; tambi�n se encargar� de invocar a la
+	@; rutina _gm_pintarFranjas(), para actualizar la representaci�n gr�fica
+	@; de la ocupaci�n de la memoria de procesos.
+	@;Par�metros
+	@;	R0: el n�mero de z�calo que libera la memoria
+_gm_liberarMem:
+	push {r4-r8, lr}
+	mov r4, r0
+	ldr r5, =_gm_zocMem
+	mov r6, #0					@;index
+
+.Lfree_loop:
+	cmp r6, #NUM_FRANJAS
+	bge .Lfree_end
+	
+	ldrb r7, [r5, r6]
+	cmp r7, r4					@;_gm_zocMem[i] pertany a zocalo?
+	bne .Lfree_next
+	@;sino, lliberar franja
+	mov r8, #0
+	strb r8, [r5, r6]
+	
+	@;pintar pantalla inferior
+	@;_gs_pintarFranjas(zocalo, index_ini, num_franjas, tipo_seg)
+	push {r0-r3}
+	mov r0, #0					@;0 per borrar
+	mov r1, r6
+	mov r2, #1					@;vaig pintant segons trobo caselles
+	mov r3, #0					@;indiferent
+	bl _gs_pintarFranjas
+	pop {r0-r3}
+	
+	
+.Lfree_next:
+	add r6, #1
+	b .Lfree_loop
+	
+.Lfree_end:
+	pop {r4-r8, pc}
+
+
+
+	.global _gm_rsiTIMER1
+	@; Rutina de Servicio de Interrupci�n (RSI) para actualizar la representa-
+	@; ci�n de la pila y el estado de los procesos activos.
+_gm_rsiTIMER1:
+	push {r0-r10, lr}
+	bl _gs_representarPilas		@;pintar columna Pi
+	
+	mov r4, #0					@;index pel numero de zocalo 
+.Lloop_state:
+	cmp r4, #16
+	bge .Lrsi_end
+	
+	ldr r5, =_gd_pcbs			@; vector procs. actius
+	@;calcular offset = index zocal * 24 (mida pcb -> 16 zocalos, 6 camps, 4B cada camp)
+	mov r0, #24
+	mla r5, r4, r0, r5			@;PCB zocalo-i (z*24 + base)
+	ldr r6, [r5]				@;PID
+	
+	@;PROBLEMA: al començar en 0 es borrara i mai escriura res
+	@;al proc de control (zocalo 0)
+	cmp r4, #0
+	beq .Lexcepcio_zocalo
+	cmp r6, #0
+	beq .Lborrar_state
+	
+.Lexcepcio_zocalo:
+	@;busqueda valor estat
+	ldr r7, =_gd_pidz			@;PID+zocalo
+	ldr r7, [r7]
+	and r7, r7, #0xF			@;mascara para numero de zocalo (2^4 = 16 ventanas)
+	cmp r7, r4
+	beq .Lstate_R
+	
+	ldr r8, =_gd_nDelay			@;num procs. en blocked
+	cmp r8, #0
+	beq .Lstate_Y				@;si no hay, proceso es ready
+	
+	ldr r9, =_gd_qDelay			@;cua procs. retardats
+	mov r10, #0					@;index cua
+
+.Lbusqueda_delay:
+	ldr r0, [r9, r10, lsl #2]	@;word 32 bits
+	mov r0, r0, lsr #24
+	cmp r0, r4
+	beq .Lstate_B
+	add r10, #1
+	cmp r10, r8
+	blt .Lbusqueda_delay
+	
+.Lstate_Y:
+	ldr r0, =.Lstr_Y
+	mov r3, #0					@;color blanc (0)
+	b .Lescriure_lletra
+	
+.Lstate_B:
+	ldr r0, =.Lstr_B
+	mov r3, #0
+	b .Lescriure_lletra
+ 
+.Lstate_R:
+	ldr r0, =.Lstr_R
+	mov r3, #1					@;color blau (1)
+	b .Lescriure_lletra
+
+.Lborrar_state:
+	ldr r0, =.Lstr_Empty
+	mov r3, #0
+	
+.Lescriure_lletra:
+	@;_gs_escribirStringSub(char *s, int fil, int col, int color)
+	add r1, r4, #4				@;primera fila = 4
+	mov r2, #26					@; columna E = 26
+	bl _gs_escribirStringSub
+	
+	add r4, #1
+	b .Lloop_state
+	
+.Lrsi_end:
+	pop {r0-r10, pc}
+	
+.section .rodata
+	.align 2
+	.Lstr_R:     .asciz "R"
+	.Lstr_Y:     .asciz "Y"
+	.Lstr_B:     .asciz "B"
+	.Lstr_Empty: .asciz " "
+	
+	
+	.global _gm_pintarFranjas
+	
+	@; Rutina adicional del progM permet distingir les franges
+	@; dels processos d'usuari que estan ocupades per memoria dinamica
+	@; mitjançant les funcions _gm_do_malloc per reservar 
+	@; & _gm_do_free per lliberar, ambdues tambe modificades.
+	@; Parametres:
+	@; r0 = zocalo - 0 borrar/blanc
+	@; r1 = index_ini
+	@; r2 = n_franjes (per pintar)
+	@; r3 = tipus franja - 0: franja normal; 1: franja invertida
+	
+	@;_gs_pintarFranjas(zocalo, index_ini, num_franjas, tipo_seg)
+	@;1 = color gris redefinit en el main.c
+_gm_pintarFranjas:
+	push {r4-r11, lr}
+	
+	ldr r5, =_gs_colZoc
+    ldrb r8, [r5, r0]           @; R8 = color paleta correspondiente al z�calo
+    mov r9, #1                  @; R9 = color gris (G)
+	
+	cmp r0, #0					@;si zocalo = 0 -> borrar, colors = 0
+    moveq r8, #0
+    moveq r9, #0
+	
+	@;calcul direcció en VRAM
+	and r4, r1, #7				@; R4 = �nidice franja inicial m�dulo 8
+	mov r1, r1, lsr #3			@; R1 = �ndice inicial dividido por 8
+	add r1, #512				@; saltar 512 baldosas (caracteres)
+	mov r1, r1, lsl #6			@; multiplicar todo por 64 bytes por baldosa
+	ldr r0, =0x06204000			@;base VRAM
+	add r0, r1					@; R0 apunta a la primera baldosa de las franjas
+
+.Lbucle_franges:
+	cmp r2, #0
+	beq .Lend
+	mov r5, #0					@;offset fila
+	
+.Lbucle_vertical:
+	@; Filas exteriors: 0 y 24. Filas centrals: 8 y 16.
+	cmp r5, #0
+    beq .Lcheck_extrems
+    cmp r5, #24
+    beq .Lcheck_extrems
+	
+.Lcheck_centrals:
+	cmp r3, #0
+    moveq r10, r8                @;si tipu 0 = color zocalo
+    movne r10, r9                @;si tipu 1 = gris
+    b .Lwrite_vram
+	
+.Lcheck_extrems:
+	cmp r3, #0
+    moveq r10, r9                @;si tipus 0 = gris
+    movne r10, r8                @;si tipu 1 = color zocalo
+	
+.Lwrite_vram:
+	@;fila(r5) + columna(r4)
+	add r6, r4, r5				@; R6 apunta a columna inicial de p�xeles
+	add r6, #16					@; saltar 2 filas de p�xeles
+	ldrh r7, [r0, r6]			@; R7 = valor 2 bytes de baldosa a modificar
+	tst r4, #1
+	
+	andne r7, #0xFF				@; paridad �ndice columna impar:
+	movne r11, r10, lsl #8			@; limpiar byte alto, fijar byte alto
+    orrne r7, r11
+	
+	biceq r7, #0xFF				@; paridad �ndice columna par:
+	orreq r7, r10					@; limpiar byte bajo, fijar byte bajo
+	
+	strh r7, [r0, r6]            @; actualizar memoria de v�deo
+	
+	add r5, #8					@;seguent fila
+	cmp r5, #32
+	blo .Lbucle_vertical
+	
+	@; seguent franja
+	add r4, #1
+	cmp r4, #8
+    moveq r4, #0
+    addeq r0, #64
+	
+	sub r2, #1
+	b .Lbucle_franges
+	
+.Lend:
+	pop {r4-r11, pc}
+	
 .end
 
