@@ -14,11 +14,11 @@ extern int * punixTime;		// puntero a zona de memoria con el tiempo real
 
 const short divFreq2 = -33513982/(1024*4);	// frecuencia de TIMER2 = 4 Hz
 
-const char *argumentosDisponibles[4] = { "0", "1", "2", "3"};
+const char *argumentosDisponibles[7] = { "0", "1", "2", "3", "5", "6", "7"};
 		// se supone que estos programas están disponibles en el directorio
 		// "Programas" de las estructura de ficheros de Nitrofiles
-const char *progs[5] = {"BORR","CRON","HOLA","PONG","PRNT"};
-const unsigned char num_progs = 5;
+const char *progs[6] = {"BORR","CRON","HOLA","PONG","PRNT","DNIF",};
+const unsigned char num_progs = 6;
 
 
 /* Función para presentar una lista de opciones y escoger una: devuelve el índice de la opción
@@ -67,6 +67,80 @@ unsigned char escogerOpcion(char *opciones[], unsigned char num_opciones)
 }
 
 
+//------------------------------------------------------------------------------
+// JOC DE PROVES PROG G - SPRITES
+//------------------------------------------------------------------------------
+
+// Crea un Sprite a unes coordenades x,y
+void prova_estatica(int z)
+ {
+	unsigned char n, icon;
+	short px, py;
+	
+	n = 0; icon =0; px = 112; py = 80; // centre
+	_gg_spriteSet(n, icon, z);
+	_gg_spriteMove(n, px, py, z);
+	_gg_spriteShow(n, z);
+
+	n = 1; icon =9; px = -16; py = -16; // superior esquerra
+	_gg_spriteSet(n, icon, z);
+	_gg_spriteMove(n, px, py, z);
+	_gg_spriteShow(n, z);
+ }
+ 
+ void prova_estatica2(int z)
+ {
+	unsigned char n;
+	
+	n = 0;// centre
+	_gg_spriteHide(n, z);
+
+	n = 1; // superior esquerra
+	_gg_spriteHide(n, z);
+ }
+ 
+ void prova_dvd(int z) {
+ 
+ 	short maxX = 256 - 32;
+	short maxY = 192 - 32;
+	short minX = 0;
+	short minY = 0;
+	short dirX = 50;
+	short dirY = 25;
+	
+	unsigned char n, icon;
+	short px, py;
+ 
+	n = 6; icon = 3; px = minX; py = minY;
+	_gg_spriteSet(n, icon, z);
+	_gg_spriteMove(n, px, py, z);
+	_gg_spriteShow(n, z);
+	
+ 	for (int i = 0; i < 200; i++) {
+		// VENTANA
+		px += dirX;
+		py += dirY;
+		
+		if (px >= maxX) {
+			px = maxX;
+			dirX = -dirX;
+		} else if (px <= minX) {
+			px = minX;
+			dirX = -dirX;
+		}
+		
+		if (py >= maxY) {
+			py = maxY;
+			dirY = -dirY;
+		} else if (py <= minY) {
+			py = minY;
+			dirY = -dirY;
+		}
+		_gg_spriteMove(n, px, py, z);
+		_gg_escribir("\n%0Sprite[%d,%d]\n", px, py, 4);
+	}
+ }
+
 /* Función para permitir seleccionar un programa entre los ficheros ELF
 		disponibles, así como un argumento para el programa (0, 1, 2 o 3) */
 void seleccionarPrograma()
@@ -92,16 +166,31 @@ void seleccionarPrograma()
 	_gg_escribir("%1*** Seleccionar programa :\n", 0, 0, _gi_za);
 	ind_prog = escogerOpcion((char **) progs, num_progs);
 	_gg_escribir("%1*** seleccionar argumento :\n", 0, 0, _gi_za);
-	argumento = escogerOpcion((char **) argumentosDisponibles, 4);
-	
-	start = _gm_cargarPrograma((char *) progs[ind_prog]);
-	if (start)
-	{
-		_gp_crearProc(start, _gi_za, (char *) progs[ind_prog], argumento);
-		_gg_escribir("%2* %d:%s.elf", _gi_za, (unsigned int) progs[ind_prog], 0);
-		_gg_escribir(" (%d)\n", argumento, 0, 0);
-		_gg_escribirLineaTabla(_gi_za, 2);
+	argumento = escogerOpcion((char **) argumentosDisponibles, 7);
+
+	switch (argumento) {
+	  case 5-1:
+		prova_estatica(_gi_za);
+		break;
+	  case 6-1:
+	    prova_estatica2(_gi_za);
+		break;
+	  case 7-1:
+	    prova_dvd(_gi_za);
+		break;
+	  default:
+		start = _gm_cargarPrograma((char *) progs[ind_prog]);
+		if (start)
+		{
+			_gp_crearProc(start, _gi_za, (char *) progs[ind_prog], argumento);
+			_gg_escribir("%2* %d:%s.elf", _gi_za, (unsigned int) progs[ind_prog], 0);
+			_gg_escribir(" (%d)\n", argumento, 0, 0);
+			_gg_escribirLineaTabla(_gi_za, 2);
+		}
+		break;
 	}
+	
+	_gs_borrarVentana(_gi_za, 1);
 }
 
 
@@ -175,7 +264,6 @@ void inicializarSistema() {
 }
 
 
-
 //------------------------------------------------------------------------------
 int main(int argc, char **argv) {
 //------------------------------------------------------------------------------
@@ -200,6 +288,8 @@ int main(int argc, char **argv) {
 				seleccionarPrograma();
 		}
 		gestionSincronismos();
+		//_gg_escribir("\n%1Ventana[5]: %d\n", _gi_ventanaVisible(5), 0, _gi_za);
+		//_gg_escribir("\n%1SPRITES[%d]: %d\n", _gd_sprites[5*8].zocalo, _gd_sprites[5*8].visible, _gi_za);
 		_gp_WaitForVBlank();		// retardo del proceso de sistema
 	}
 	return 0;			

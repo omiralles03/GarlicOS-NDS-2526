@@ -161,7 +161,8 @@ void _gg_iniGrafA() {
   }
 
   // Factor de escalado 50%
-  SPR_fija_escalado(0, 128, 128);
+  
+  SPR_fija_escalado(0, 512, 512);
 }
 
 /* _gg_procesarFormato: copia los caracteres del string de formato sobre el
@@ -449,6 +450,11 @@ void _gg_spriteHide(unsigned char n, unsigned char zocalo) {
 
 void _gg_actualiza_sprites() {
 
+  if (_gi_nFrames > 0) return; // Evitar actualitzar en mig d'una animacio
+
+  //short zoom_actual = _gi_zoom;
+  SPR_fija_escalado(0, _gi_zoom, _gi_zoom);
+	
   for (int idx_global = 0; idx_global < 128; idx_global++) {
 
     garlicSPRITE *s = &_gd_sprites[idx_global];
@@ -456,19 +462,29 @@ void _gg_actualiza_sprites() {
     // Sprite inicialitzat
     if (s->icon != 0xFF) {
 
-      // Posicio relativa de la finestra
-      short base_x = (s->zocalo % PPART) * 128;
-      short base_y = (s->zocalo / PPART) * 96;
-
-      // Posicio absoluta de la pantalla
-      short abs_px = base_x + s->px;
-      short abs_py = base_y + s->py;
+      // Posicio de la finestra en el mapa (V*SIZE + SpritePOS)
+      int worldX = (s->zocalo & 3)*256 + s->px;
+      int worldY = (s->zocalo >> 2)*192 + s->py;
+	  
+	  // Posicio relativa (segons l'origen)
+	  int relX = worldX - _gi_orgX;
+	  int relY = worldY - _gi_orgY;
+	  
+	  // Aplicar zoom (1:1, 1:2, 1:4)
+	  int screenX = relX*256 / _gi_zoom;
+	  int screenY = relY*256 / _gi_zoom;
+	  
+	  // Aplicar desplacament per rotacioEscalado (-0, -8, -12)
+	  short offset = 16 - (16*256 / _gi_zoom);
+	  short finalX = (short)(screenX - offset);
+	  short finalY = (short)(screenY - offset);
 
       SPR_crea_sprite(idx_global, 0, 2, s->icon * 16);
       SPR_fija_prioridad(idx_global, 1);
-      SPR_mueve_sprite(idx_global, abs_px, abs_py);
+	  SPR_activa_rotacionEscalado(idx_global, 0);
+      SPR_mueve_sprite(idx_global, finalX, finalY);
 
-      if (s->visible) {
+      if (s->visible && _gi_ventanaVisible(s->zocalo)) {
         SPR_muestra_sprite(idx_global);
       } else {
         SPR_oculta_sprite(idx_global);
@@ -477,3 +493,11 @@ void _gg_actualiza_sprites() {
   }
   SPR_actualiza_sprites(OAM, 128);
 }
+
+void _gg_ocultar_sprites_OAM() {
+  for (int i = 0; i < 128; i++)
+    SPR_oculta_sprite(i);
+
+  SPR_actualiza_sprites(OAM, 128);
+}
+  
