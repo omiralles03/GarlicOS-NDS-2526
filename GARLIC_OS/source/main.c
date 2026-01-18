@@ -189,8 +189,6 @@ void seleccionarPrograma()
 		}
 		break;
 	}
-	
-	_gs_borrarVentana(_gi_za, 1);
 }
 
 
