@@ -181,7 +181,7 @@ _ga_delay:
 .Ldelay1:
 	cmp r0, #600
 	movhi r0, #600			@; limitar el n?mero de segundos a 600 (10 minutos)
-	bl _gp_retardarProc
+	@; bl _gp_retardarProc
 .Ldelay2:
 	pop {r2-r3, pc}
 
@@ -203,7 +203,7 @@ _ga_spriteSet:
 	push {r4, lr}
 	ldr r4, =_gd_pidz		@; R4 = dirección _gd_pidz
 	ldr r2, [r4]
-	and r2, #0x3			@; R2 = ventana de salida (zócalo actual MOD 4)
+	and r2, #0xf			@; R2 = ventana de salida (zócalo actual MOD 4)
 	bl _gg_spriteSet
 	pop {r4, pc}
 
@@ -217,7 +217,7 @@ _ga_spriteMove:
 	push {r4, lr}
 	ldr r4, =_gd_pidz		@; R4 = dirección _gd_pidz
 	ldr r3, [r4]
-	and r3, #0x3			@; R3 = ventana de salida (zócalo actual MOD 4)
+	and r3, #0xf			@; R3 = ventana de salida (zócalo actual MOD 4)
 	bl _gg_spriteMove
 	pop {r4, pc}
 
@@ -229,7 +229,7 @@ _ga_spriteShow:
 	push {r4, lr}
 	ldr r4, =_gd_pidz		@; R4 = dirección _gd_pidz
 	ldr r1, [r4]
-	and r1, #0x3			@; R1 = ventana de salida (zócalo actual MOD 4)
+	and r1, #0xf			@; R1 = ventana de salida (zócalo actual MOD 4)
 	bl _gg_spriteShow
 	pop {r4, pc}
 
@@ -241,7 +241,7 @@ _ga_spriteHide:
 	push {r4, lr}
 	ldr r4, =_gd_pidz		@; R4 = dirección _gd_pidz
 	ldr r1, [r4]
-	and r1, #0x3			@; R1 = ventana de salida (zócalo actual MOD 4)
+	and r1, #0xf			@; R1 = ventana de salida (zócalo actual MOD 4)
 	bl _gg_spriteHide
 	pop {r4, pc}
 
@@ -252,7 +252,7 @@ _ga_clearScreen:
 	push {r4, lr}
 	ldr r4, =_gd_pidz		@; R4 = dirección _gd_pidz
 	ldr r0, [r4]
-	and r0, #0x3			@; R1 = ventana de salida (zócalo actual MOD 4)
+	and r0, #0xf			@; R1 = ventana de salida (zócalo actual MOD 4)
 	bl _gg_clearScreen
 	pop {r4, pc}
 	

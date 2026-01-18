@@ -1,0 +1,14 @@
+CompileFlags:
+  CompilationDatabase: .
+  Add:
+    - "-DARM9"
+    - "-I../../../bmde/devkitPro/libnds/include"
+    - "-I../../../bmde/devkitPro/libnds/include/nds/arm9"
+    - "-I../../../bmde/devkitPro/libnds/include/nds/arm9/background.h"
+    - "-isystem"
+    - "../../../bmde/devkitPro/devkitARM/arm-none-eabi/include"
+    - "-I../include/"
+  QueryDriver: ["**/arm-none-eabi-gcc", "**/arm-none-eabi-g++"]
+
+Index:
+  Background: Build

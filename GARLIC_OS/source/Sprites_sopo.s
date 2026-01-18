@@ -115,7 +115,12 @@ SPR_oculta_sprite:
 		ldr r1, =oam_data		@; R1 = direccion inicial de datos oam
 		mov r2, r0, lsl #3		@; R2 = índice sprite * 8
 		ldrh r3, [r1, r2]		@; cargar valor de atributo 0
-		orr r3, #0x0200			@; activar bit 9 para ocultar sprite
+		@;orr r3, #0x0200			@; activar bit 9 para ocultar sprite
+		
+		@; Modificacio per ocultar els Sprites en modo rotacionEscalado
+		bic r3, #0x00FF			@; Desactivar Atribut 0 (8 bits baixos)
+		orr r3, #192			@; Posar Sprite a Y = 192 (no renderitzara)
+		
 		strh r3, [r1, r2]		@; guarda el nuevo valor del atributo
 		
 		pop {r0-r3, pc}

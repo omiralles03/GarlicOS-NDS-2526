@@ -1,285 +1,122 @@
 /*------------------------------------------------------------------------------
 
-	"main.c" : fase 1 + programador G
-	"main.c" : fase 1 + programador P
-	"main.c" : fase 1 / programador M
+	"main.c" : fase 2 / ProgG
 
-	Programa principal de GARLIC 1.0.
+	Programa de control del sistema operativo GARLIC, versión 2.0
+
 ------------------------------------------------------------------------------*/
 #include <nds.h>
-#include <stdio.h>
+#include <stdlib.h>
 
-#include <garlic_system.h>	// definición de funciones y variables de sistema
-
-#include <GARLIC_API.h>		// inclusión del API para simular un proceso
-#include <Sprites_sopo.h>
+#include "garlic_system.h"	// definición de funciones y variables de sistema
 
 extern int * punixTime;		// puntero a zona de memoria con el tiempo real
-void pruevas_progG();
-void check_params(int zocalo, unsigned char n, unsigned char icon, 
-	short px, short py, unsigned visible);
 
-/* Inicializaciones generales del sistema Garlic */
-//------------------------------------------------------------------------------
-void inicializarSistema() {
-//------------------------------------------------------------------------------
-	
-	_gd_seed = *punixTime;	// inicializar semilla para números aleatorios con
-	_gd_seed <<= 16;		// el valor de tiempo real UNIX, desplazado 16 bits
-	
-	// ------- Inicializaciones progG -------
-	int v;
+const short divFreq2 = -33513982/(1024*4);	// frecuencia de TIMER2 = 4 Hz
 
-	_gg_iniGrafA();			// inicializar procesador gráfico A
-	for (v = 0; v < 4; v++)	// para todas las ventanas
-		_gd_wbfs[v].pControl = 0;		// inicializar los buffers de ventana
-	
-	// ------- Inicializaciones progP -------
-	int i;
+const char *argumentosDisponibles[7] = { "0", "1", "2", "3", "5", "6", "7"};
+		// se supone que estos programas están disponibles en el directorio
+		// "Programas" de las estructura de ficheros de Nitrofiles
+const char *progs[6] = {"BORR","CRON","HOLA","PONG","PRNT","DNIF",};
+const unsigned char num_progs = 6;
 
-	irqInitHandler(_gp_IntrMain);	// instalar rutina principal interrupciones
-	irqSet(IRQ_VBLANK, _gp_rsiVBL);	// instalar RSI de vertical Blank
-	irqEnable(IRQ_VBLANK);			// activar interrupciones de vertical Blank
-	REG_IME = IME_ENABLE;			// activar las interrupciones en general
-	
-	for (i = 0; i<8; i++)		// Inicialitzacions de les bústies
-	{
-	_gd_mailboxes[i].head = 0;
-	_gd_mailboxes[i].tail = 0;
-	_gd_mailboxes[i].count = 0;
-	}
-	
-	_gd_pcbs[0].keyName = 0x4C524147;	// "GARL"
 
-	// ------- Inicializaciones progM -------
-	if (!_gm_initFS())
-	{
-		printf("ERROR: ¡no se puede inicializar el sistema de ficheros!");
-		exit(0);
-	}
-}
-
-/**
- * Función que carga un programa a partir de su nombre (4 carácteres)
- * con el argumento especificado, muestra la dirección de arranque y espera
- * a que el usuario presione 'START' para iniciar el programa.
- * Parametros
- *	prog: nombre del programa (4 carácteres)
- *	arg: argumento con el que cargar el programa
- *  ventana: número [0..3] de la ventana a la que dirigir la salida
- * Retorna:
- *	Dirección en la que se ha cargado el programa
- */
-intFunc cargarPrograma(char prog[4], int arg, int zocalo) 
+/* Función para presentar una lista de opciones y escoger una: devuelve el índice de la opción
+		(0: primera opción, 1: segunda opción, etc.)
+		ATENCIóN: para que pueda funcionar correctamente, se supone que no habrá desplazamiento
+				  de las líneas de la ventana. */
+unsigned char escogerOpcion(char *opciones[], unsigned char num_opciones)
 {
-	intFunc start = _gm_cargarPrograma(prog);
-	if (start) 
-	{	
-		_gg_escribir("\n ** Programa: %s\n\n", (unsigned int)prog, 0, zocalo % 4);
-		_gp_crearProc(start, zocalo, prog, arg);
-	} 
-	else
-	{ 
-		_gg_escribir("\n* ERROR al cargar %s(%d)\n", (unsigned int)prog, (unsigned int)arg, zocalo % 4);
-	}
-	return start;
-}
-
-
-//------------------------------------------------------------------------------
-int main(int argc, char **argv) {
-//------------------------------------------------------------------------------
-
-	inicializarSistema();
+	int fil_ini, j, sel, k;
 	
-	_gg_escribir("********************************", 0, 0, 0);
-	_gg_escribir("*                              *", 0, 0, 0);
-	_gg_escribir("* Sistema Operativo GARLIC 1.0 *", 0, 0, 0);
-	_gg_escribir("*                              *", 0, 0, 0);
-	_gg_escribir("********************************", 0, 0, 0);
-	_gg_escribir("*** Inicio fase GARLIC\n", 0, 0, 0);
+	fil_ini = _gd_wbfs[_gi_za].pControl >> 16;		// fil_ini es índice fila inicial
+	for (j = 0; j < num_opciones; j++)			// mostrar opciones
+		_gg_escribir("%1( ) %s\n", (unsigned int) opciones[j], 0, _gi_za);
 
-	pruevas_progG();
-	cargarPrograma("PRNT", 5, 1);
-	cargarPrograma("DNIF", 0, 2);
-	cargarPrograma("COLZ", 0, 3);
-	cargarPrograma("MMLL", 1, 4);
-	cargarPrograma("HOLA", 2, 6);
-
-	while (1)
+	sel = -1;									// marca de no selección
+	j = 0;										// j es preselección
+	_gg_escribirCar(1, fil_ini, 10, 2, _gi_za);	// marcar preselección
+	do
 	{
 		_gp_WaitForVBlank();
-	}
-	return 0;
+		scanKeys();
+		k = keysDown();				// leer botones
+		if (k != 0)
+			switch (k)
+			{
+				case KEY_UP:
+						if (j > 0)
+						{	_gg_escribirCar(1, fil_ini+j, 0, 2, _gi_za);
+							j--;
+							_gg_escribirCar(1, fil_ini+j, 10, 2, _gi_za);
+						}
+						break;
+				case KEY_DOWN:
+						if (j < num_opciones-1)
+						{	_gg_escribirCar(1, fil_ini+j, 0, 2, _gi_za);
+							j++;
+							_gg_escribirCar(1, fil_ini+j, 10, 2, _gi_za);
+						}
+						break;
+				case KEY_START:
+						sel = j;			// escoger preselección
+						break;
+			}
+	} while (sel == -1);
+	return sel;
 }
+
 
 //------------------------------------------------------------------------------
 // JOC DE PROVES PROG G - SPRITES
 //------------------------------------------------------------------------------
-// Rutina per veure els parametres dels sprites
-void check_params(int zocalo, unsigned char n, unsigned char icon, 
-	short px, short py, unsigned visible)
-{
-	int idx_global = (zocalo * MAX_SPRITE_PROC) + n;
-	_gg_escribir("\n\n> Zocalo: %d - %d", zocalo, _gd_sprites[idx_global].zocalo, zocalo);
-	_gg_escribir("\n> Sprite idx: %d - %d", n, _gd_sprites[idx_global].n, zocalo);
-	_gg_escribir("\n> Icon: %d - %d", icon, _gd_sprites[idx_global].icon, zocalo);
-	_gg_escribir("\n> Pos. : [%d,%d] - ", px, py, zocalo);
-	_gg_escribir("[%d,%d]", _gd_sprites[idx_global].px, _gd_sprites[idx_global].py, zocalo);
-	_gg_escribir("\n> Visib. %d - %d", visible, _gd_sprites[idx_global].visible, zocalo);
-}
 
-void pruevas_progG()
-{
-	unsigned char n, icon, visible;
+// Crea un Sprite a unes coordenades x,y
+void prova_estatica(int z)
+ {
+	unsigned char n, icon;
 	short px, py;
-	int zocalo;
 	
-	// ------- Prueba 1: Posiciones -------
-	zocalo = 0;
-	_gg_escribir("\n\n*** Prueba 1\n", 0, 0, zocalo);
-	_gg_escribir("\n\n* Valor Esperado - Vector *\n", 0, 0, zocalo);
-	for (int i = 0; i < 50; i++)
-		_gp_WaitForVBlank();
-		
-	n = 0; icon = 0; px = 48; py = 32; visible = 1;
-	_gg_spriteSet(n, icon, zocalo);
-	_gg_spriteMove(n, px, py, zocalo);
-	_gg_spriteShow(n, zocalo);
-	check_params(zocalo, n, icon, px, py, visible);
-	for (int i = 0; i < 75; i++)
-		_gp_WaitForVBlank();
-		
-	n = 1; icon = 1; px = 176; py = 32; visible = 1;
-	_gg_spriteSet(n, icon, zocalo);
-	_gg_spriteMove(n, px, py, zocalo);
-	_gg_spriteShow(n, zocalo);
-	check_params(zocalo, n, icon, px, py, visible);
-	for (int i = 0; i < 75; i++)
-		_gp_WaitForVBlank();
-		
-	n = 2; icon = 2; px = 48; py = 80; visible = 1;
-	_gg_spriteSet(n, icon, zocalo);
-	_gg_spriteMove(n, px, py, zocalo);
-	_gg_spriteShow(n, zocalo);
-	check_params(zocalo, n, icon, px, py, visible);
-	for (int i = 0; i < 75; i++)
-		_gp_WaitForVBlank();
-		
-	n = 3; icon = 3; px = -300; py = 300; visible = 1;
-	_gg_spriteSet(n, icon, zocalo);
-	_gg_spriteMove(n, px, py, zocalo);
-	_gg_spriteShow(n, zocalo);
-	check_params(zocalo, n, icon, px, py, visible);
-	for (int i = 0; i < 75; i++)
-		_gp_WaitForVBlank();
-		
-	// Mover sprite 0 a la pos 0,0
-	n = 0; px = 0; py = 0; visible = 1;
-	_gg_spriteMove(n, px, py, zocalo);
-	check_params(zocalo, n, icon, px, py, visible);
-	_gg_escribir("\n\n*** Fin Prueba 1\n", 0, 0, zocalo);
-	
-	for (int i = 0; i < 75; i++)
-		_gp_WaitForVBlank();
-		
-	_gg_spriteHide(0, zocalo);
-	_gg_spriteHide(1, zocalo);
-	_gg_spriteHide(2, zocalo);
-	_gg_spriteHide(3, zocalo);
-	
-	// ------- Prueba 2: Movimiento -------
-	zocalo = 1;
-	_gg_escribir("\n\n*** Prueba 2\n", 0, 0, zocalo);
-	_gg_escribir("\n\n* Valor Esperado - Vector *\n", 0, 0, zocalo);
-	for (int i = 0; i < 50; i++)
-		_gp_WaitForVBlank();
-	
-	n = 4; icon = 10; px = 48; py = 32; visible = 1;
-	int idx_global = (zocalo * 8) + n;
-	_gg_spriteSet(n, icon, zocalo);
-	_gg_spriteMove(n, px, py, zocalo);
-	_gg_spriteShow(n, zocalo);
-	check_params(zocalo, n, icon, px, py, visible);
-	for (int i = 0; i < 50; i++)
-		_gp_WaitForVBlank();
-	
-	short dir = 2;
-	for (int i = 0; i < 60; i++) {
-		if (i%10 == 0) {
-			dir = -dir;
-		}
-		py += dir;
-		_gg_spriteMove(n, px, py, zocalo);
-		_gg_escribir("\n> Pos. : [%d,%d] - ", px, py, zocalo);
-		_gg_escribir("[%d,%d]", _gd_sprites[idx_global].px, _gd_sprites[idx_global].py, zocalo);
-	}
-	
-	_gg_escribir("\n\n*** Fin Prueba 2\n", 0, 0, zocalo);
-	for (int i = 0; i < 50; i++)
-		_gp_WaitForVBlank();
-	_gg_spriteHide(n, zocalo);	
-	
-	// ------- Prueba 3: Cambio de indice -------
-	zocalo = 2;
-	_gg_escribir("\n\n*** Prueba 3\n", 0, 0, zocalo);	
-	_gg_escribir("\n\n* Valor Esperado - Vector *\n", 0, 0, zocalo);
-	for (int i = 0; i < 50; i++)
-		_gp_WaitForVBlank();
-		
-	n = 5; icon = 12; px = 48; py = 32; visible = 1;
-	idx_global = (zocalo * 8) + n;
-	_gg_spriteSet(n, icon, zocalo);
-	_gg_spriteMove(n, px, py, zocalo);
-	_gg_spriteShow(n, zocalo);
-	check_params(zocalo, n, icon, px, py, visible);
-	for (int i = 0; i < 50; i++)
-		_gp_WaitForVBlank();
-	
-	for (int i = 0; i < 300; i++) {
-		if (i%60 == 0 && i != 0) {
-			icon++;
-			_gg_spriteSet(n, icon, zocalo);
-			_gg_spriteShow(n, zocalo);
-			_gg_escribir("\n> Icon: %d - %d\n", icon, _gd_sprites[idx_global].icon, zocalo);
-			for (int i = 0; i < 50; i++)
-				_gp_WaitForVBlank();
-			
-		}
-	}
-	
-	_gg_escribir("\n\n*** Fin Prueba 3\n", 0, 0, zocalo);
-	
-	for (int i = 0; i < 50; i++)
-		_gp_WaitForVBlank();
-		
-	_gg_spriteHide(n, zocalo);
+	n = 0; icon =0; px = 112; py = 80; // centre
+	_gg_spriteSet(n, icon, z);
+	_gg_spriteMove(n, px, py, z);
+	_gg_spriteShow(n, z);
 
-	// ------- Prueba 4: Movimiento en region -------
-	zocalo = 3;
-	_gg_escribir("\n\n*** Prueba 4\n", 0, 0, zocalo);
-	_gg_escribir("\n\n* Valor Esperado - Vector *\n", 0, 0, zocalo);
-	for (int i = 0; i < 50; i++)
-		_gp_WaitForVBlank();
+	n = 1; icon =9; px = -16; py = -16; // superior esquerra
+	_gg_spriteSet(n, icon, z);
+	_gg_spriteMove(n, px, py, z);
+	_gg_spriteShow(n, z);
+ }
+ 
+ void prova_estatica2(int z)
+ {
+	unsigned char n;
 	
-	// Ventana
-	short maxX = 128 - 32;
-	short maxY = 96 - 32;
+	n = 0;// centre
+	_gg_spriteHide(n, z);
+
+	n = 1; // superior esquerra
+	_gg_spriteHide(n, z);
+ }
+ 
+ void prova_dvd(int z) {
+ 
+ 	short maxX = 256 - 32;
+	short maxY = 192 - 32;
 	short minX = 0;
 	short minY = 0;
-	short dirX = 2;
-	short dirY = 1;
+	short dirX = 50;
+	short dirY = 25;
 	
-	n = 6; icon = 3; px = minX; py = minY; visible = 1;
-	idx_global = (zocalo * 8) + n;
-	_gg_spriteSet(n, icon, zocalo);
-	_gg_spriteMove(n, px, py, zocalo);
-	_gg_spriteShow(n, zocalo);
-	check_params(zocalo, n, icon, px, py, visible);
-	for (int i = 0; i < 50; i++)
-		_gp_WaitForVBlank();
+	unsigned char n, icon;
+	short px, py;
+ 
+	n = 6; icon = 3; px = minX; py = minY;
+	_gg_spriteSet(n, icon, z);
+	_gg_spriteMove(n, px, py, z);
+	_gg_spriteShow(n, z);
 	
-	for (int i = 0; i < 200; i++) {
+ 	for (int i = 0; i < 200; i++) {
 		// VENTANA
 		px += dirX;
 		py += dirY;
@@ -299,21 +136,159 @@ void pruevas_progG()
 			py = minY;
 			dirY = -dirY;
 		}
-		_gg_spriteMove(n, px, py, zocalo);
-		_gg_escribir("\n> Pos. : [%d,%d] - ", px, py, zocalo);
-		_gg_escribir("[%d,%d]\n", _gd_sprites[idx_global].px, _gd_sprites[idx_global].py, zocalo);
+		_gg_spriteMove(n, px, py, z);
+		_gg_escribir("\n%0Sprite[%d,%d]\n", px, py, 4);
 	}
-	
-	_gg_escribir("\n\n*** Fin Prueba 4\n", 0, 0, zocalo);
-	
-	for (int i = 0; i < 50; i++)
-		_gp_WaitForVBlank();
-		
-	_gg_spriteHide(n, zocalo);
-		
-	for (int i = 0; i < 4; i++) {
-		_gg_clearScreen(i);
+ }
+
+/* Función para permitir seleccionar un programa entre los ficheros ELF
+		disponibles, así como un argumento para el programa (0, 1, 2 o 3) */
+void seleccionarPrograma()
+{
+	intFunc start;
+	int ind_prog, argumento, i;
+
+	i = 1;
+	while ((i < 16) &&	(_gd_pcbs[i].PID == 0))	// buscar si hay otro proceso en marcha
+	{
+		i++;
 	}
-	for (int i = 0; i < 25; i++)
-		_gp_WaitForVBlank();
+	if (i < 16)						// en caso de encontrar otro proceso activo
+	{
+		_gd_pcbs[i].PID = 0;		// liberar su PCB
+		_gd_nReady = 0;				// eliminar cualquier proceso de cola de READY
+		_gg_escribir("* %3%d%0: proceso destruido\n", i, 0, 0);
+		_gg_escribirLineaTabla(i, (i == _gi_za ? 2 : 3));
+		if (i != _gi_za)			// si no se trata del propio zócalo actual
+			_gg_generarMarco(i, 3);
+	}
+	_gs_borrarVentana(_gi_za, 1);
+	_gg_escribir("%1*** Seleccionar programa :\n", 0, 0, _gi_za);
+	ind_prog = escogerOpcion((char **) progs, num_progs);
+	_gg_escribir("%1*** seleccionar argumento :\n", 0, 0, _gi_za);
+	argumento = escogerOpcion((char **) argumentosDisponibles, 7);
+
+	switch (argumento) {
+	  case 5-1:
+		prova_estatica(_gi_za);
+		break;
+	  case 6-1:
+	    prova_estatica2(_gi_za);
+		break;
+	  case 7-1:
+	    prova_dvd(_gi_za);
+		break;
+	  default:
+		start = _gm_cargarPrograma((char *) progs[ind_prog]);
+		if (start)
+		{
+			_gp_crearProc(start, _gi_za, (char *) progs[ind_prog], argumento);
+			_gg_escribir("%2* %d:%s.elf", _gi_za, (unsigned int) progs[ind_prog], 0);
+			_gg_escribir(" (%d)\n", argumento, 0, 0);
+			_gg_escribirLineaTabla(_gi_za, 2);
+		}
+		break;
+	}
+}
+
+
+
+/* gestionSincronismos:	función para detectar cuándo un proceso ha terminado
+						su ejecución, consultando el bit i-éssimo de la
+						variable global _gd_sincMain; en caso de detección,
+						borra la línea del proceso del zócalo i-éssimo y pone
+						el bit de _gd_sincMain a cero.
+*/
+void gestionSincronismos()
+{
+	int i, mask;
+	
+	if (_gd_sincMain & 0xFFFE)		// si hay algun sincronismo pendiente
+	{
+		mask = 2;
+		for (i = 1; i <= 15; i++)
+		{
+			if (_gd_sincMain & mask)
+			{	// actualizar visualización de tabla de zócalos
+				_gg_escribirLineaTabla(i, (i == _gi_za ? 2 : 3));
+				if (i != _gi_za)			// si no se trata del propio zócalo actual
+					_gg_generarMarco(i, 3);
+				_gg_escribir("%3* %d: proceso terminado\n", i, 0, 0);
+				_gd_sincMain &= ~mask;		// poner bit a cero
+			}
+			mask <<= 1;
+		}
+	}
+}
+
+
+
+/* Inicializaciones generales del sistema Garlic */
+//------------------------------------------------------------------------------
+void inicializarSistema() {
+//------------------------------------------------------------------------------
+
+	_gd_seed = *punixTime;	// inicializar semilla para números aleatorios con
+	_gd_seed <<= 16;		// el valor de tiempo real UNIX, desplazado 16 bits
+	
+	_gd_pcbs[0].keyName = 0x4C524147;	// "GARL"
+	
+	_gg_iniGrafA();					// inicializar gráficos
+	_gs_iniGrafB();
+	_gs_dibujarTabla();
+	
+	_gi_redibujarZocalo(1);			// marca tabla de zócalos con el proceso
+									// del S.O. seleccionado (en verde)
+	
+	if (!_gm_initFS())
+	{	_gg_escribir("%3ERROR: ¡no se puede utilizar sistema de ficheros!", 0, 0, 0);
+		exit(0);
+	}
+
+	irqInitHandler(_gp_IntrMain);	// instalar rutina principal interrupciones
+	irqSet(IRQ_VBLANK, _gp_rsiVBL);	// instalar RSI de vertical Blank
+	irqEnable(IRQ_VBLANK);			// activar interrupciones de vertical Blank
+
+	irqSet(IRQ_TIMER2, _gg_rsiTIMER2);
+	irqEnable(IRQ_TIMER2);			// instalar la RSI para el TIMER2
+	TIMER2_DATA = divFreq2; 
+	TIMER2_CR = 0xC3;  		// Timer Start | IRQ Enabled | Prescaler 3 (F/1024)
+
+	irqSet(IRQ_VCOUNT, _gi_movimientoVentanas);
+	REG_DISPSTAT |= 0xE620;			// fijar linea VCOUNT a 230 y activar int.
+	irqEnable(IRQ_VCOUNT);			// de VCOUNT
+	
+	REG_IME = IME_ENABLE;			// activar las interrupciones en general
+}
+
+
+//------------------------------------------------------------------------------
+int main(int argc, char **argv) {
+//------------------------------------------------------------------------------
+	int key;
+
+	inicializarSistema();
+	
+	_gg_escribir("%1********************************", 0, 0, 0);
+	_gg_escribir("%1*                              *", 0, 0, 0);
+	_gg_escribir("%1* Sistema Operativo GARLIC 2.0 *", 0, 0, 0);
+	_gg_escribir("%1*                              *", 0, 0, 0);
+	_gg_escribir("%1********************************", 0, 0, 0);
+	_gg_escribir("%1*** Inicio fase 2 / ProgG\n", 0, 0, 0);
+
+	while (1)						// bucle infinito
+	{
+		scanKeys();
+		key = keysDown();			// leer botones y controlar la interfaz
+		if (key != 0)				// de usuario
+		{	_gi_controlInterfaz(key);
+			if ((key == KEY_START) && (_gi_za != 0))
+				seleccionarPrograma();
+		}
+		gestionSincronismos();
+		//_gg_escribir("\n%1Ventana[5]: %d\n", _gi_ventanaVisible(5), 0, _gi_za);
+		//_gg_escribir("\n%1SPRITES[%d]: %d\n", _gd_sprites[5*8].zocalo, _gd_sprites[5*8].visible, _gi_za);
+		_gp_WaitForVBlank();		// retardo del proceso de sistema
+	}
+	return 0;			
 }
